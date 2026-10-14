@@ -54,7 +54,11 @@ public final class Sky {
 		return value(level, sunAngle, pos, Float.NaN);
 	}
 
-	/** Where the moon stands, in degrees, counted the same way as {@link #sunAngle}. NaN if the game doesn't tell us. */
+	/**
+	 * Where the moon stands, in degrees, as the game reports it. It may be counted like {@link #sunAngle}
+	 * or from the opposite side of the sky; since the moon always stands opposite the sun, callers can
+	 * tell by comparing the two. NaN if the game doesn't tell us.
+	 */
 	public static float moonAngle(ClientLevel level, BlockPos pos) {
 		lookUp();
 		return value(level, moonAngle, pos, Float.NaN);

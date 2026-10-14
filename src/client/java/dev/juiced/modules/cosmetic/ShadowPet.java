@@ -190,22 +190,26 @@ public final class ShadowPet extends CosmeticModule {
 	private double lastZ;
 	private boolean placed;
 
-	// Light, aimed every tick and eased per frame: the shadow per block of height (direction and length)
-	private float castX;
-	private float castZ = -1f;
+	// Light, aimed every tick and eased per frame. Direction (radians on the ground, 0 = +X) and length
+	// (blocks of shadow per block of height) are eased apart, so a flip turns the shadow around instead
+	// of shrinking it to a point on the way.
+	private float castAngle = (float) (-Math.PI / 2);
+	private float castLength = 1f;
 	private float soft = 1f;
 	private float light;
 	private float night;
-	private float aimX;
-	private float aimZ = -1f;
+	private float aimAngle = castAngle;
+	private float aimLength = 1f;
 	private float aimSoft = 1f;
 	private float aimLight = 0.5f;
 	private float aimNight;
 
-	// Ground under you while you are in the air
+	// Ground under you: where you land while in the air, and how far thin blocks (snow layers, soul
+	// sand) show above your feet while you stand
 	private final BlockPos.MutableBlockPos probe = new BlockPos.MutableBlockPos();
 	private double groundY;
 	private boolean hasGround;
+	private float groundLift;
 
 	// Reused buffers: the outline in side view, then on the ground (camera relative)
 	private final float[] ox = new float[MAX_POINTS];
@@ -234,6 +238,11 @@ public final class ShadowPet extends CosmeticModule {
 	protected void onDisable() {
 		placed = false;
 		hasGround = false;
+		groundLift = 0f;
+		// Fade in again next time, in the light of the new world
+		light = 0f;
+		still = 0f;
+		sit = 0f;
 	}
 
 	// ---- light and ground, once per tick ------------------------------------------------------
@@ -261,8 +270,14 @@ public final class ShadowPet extends CosmeticModule {
 			return;
 		}
 
+		// The moon always stands opposite the sun. If its angle reads close to the sun's, it is counted
+		// from the other side of the sky, so turn it around (and guess it if the game doesn't tell us).
+		if (Float.isNaN(moon) || Math.cos(Math.toRadians(moon - sun)) > 0.0) {
+			moon = Float.isNaN(moon) ? sun + 180f : moon + 180f;
+		}
+
 		float sunUp = above(sun);
-		float moonUp = Float.isNaN(moon) ? 0f : above(moon) * (1f - sunUp);
+		float moonUp = above(moon) * (1f - sunUp);
 
 		if (sunUp < 0.02f && moonUp < 0.02f) {
 			// Twilight: neither stands high enough to cast a shadow
@@ -296,20 +311,15 @@ public final class ShadowPet extends CosmeticModule {
 		float east = (float) Math.sin(a);
 		float up = (float) Math.cos(a);
 		float north = -0.3f * up;
-		float len = (float) Math.sqrt(east * east + north * north);
 		// Length per block of height: tan of the angle from straight up, kept between 1 and 3.5
-		float stretch = Math.max(1f, Math.min(3.5f, Math.abs(east) / Math.max(0.01f, up)));
-		aimX = east / len * stretch;
-		aimZ = north / len * stretch;
+		aimLength = Math.max(1f, Math.min(3.5f, Math.abs(east) / Math.max(0.01f, up)));
+		aimAngle = (float) Math.atan2(north, east);
 	}
 
-	/** A short, soft shadow under you that keeps its last direction. */
+	/** A short, soft shadow under you that keeps its current direction. */
 	private void aimSoftly(float strength) {
-		float len = (float) Math.sqrt(castX * castX + castZ * castZ);
-		float dx = len > 0.05f ? castX / len : 0f;
-		float dz = len > 0.05f ? castZ / len : -1f;
-		aimX = dx * 0.55f;
-		aimZ = dz * 0.55f;
+		aimAngle = castAngle;
+		aimLength = 0.55f;
 		aimSoft = 1f;
 		aimLight = strength;
 	}
@@ -317,15 +327,16 @@ public final class ShadowPet extends CosmeticModule {
 	/** The ground under you: your feet while you stand, otherwise the first solid block a few blocks below. */
 	private void findGround(ClientLevel level, LocalPlayer self) {
 		double feet = self.getY();
+		int x = (int) Math.floor(self.getX());
+		int z = (int) Math.floor(self.getZ());
 
 		if (self.onGround()) {
 			groundY = feet;
+			groundLift = (float) (visibleTop(level, x, z, feet) - feet);
 			hasGround = true;
 			return;
 		}
 
-		int x = (int) Math.floor(self.getX());
-		int z = (int) Math.floor(self.getZ());
 		int top = (int) Math.floor(feet);
 		hasGround = false;
 
@@ -340,11 +351,29 @@ public final class ShadowPet extends CosmeticModule {
 			double surface = y + shape.max(Direction.Axis.Y);
 
 			if (surface <= feet + 0.01) {
-				groundY = surface;
+				groundY = visibleTop(level, x, z, surface);
 				hasGround = true;
 				return;
 			}
 		}
+	}
+
+	/**
+	 * Some blocks look a little higher than you stand on them: a thin snow layer (no collision at all),
+	 * soul sand, mud, a pressure plate. A shadow at your feet would be hidden inside them, so it goes on
+	 * top. Taller things at your feet (grass, flowers, torches) are left alone.
+	 */
+	private double visibleTop(ClientLevel level, int x, int z, double surface) {
+		int y = (int) Math.floor(surface + 1.0e-3);
+		probe.set(x, y, z);
+		VoxelShape shape = level.getBlockState(probe).getShape(level, probe);
+
+		if (shape.isEmpty()) {
+			return surface;
+		}
+
+		double top = y + shape.max(Direction.Axis.Y);
+		return top > surface && top - surface < 0.2 ? top : surface;
 	}
 
 	// ---- drawing --------------------------------------------------------------------------------
@@ -376,8 +405,10 @@ public final class ShadowPet extends CosmeticModule {
 		sit = Clock.approach(sit, sitTarget, sitTarget > sit ? 4f : 10f);
 		crouch = Clock.approach(crouch, crouching ? 1f : 0f, 10f);
 
-		castX = Clock.approach(castX, aimX, 1.5f);
-		castZ = Clock.approach(castZ, aimZ, 1.5f);
+		// Turn the short way round
+		float turn = (float) Math.IEEEremainder(aimAngle - castAngle, Math.PI * 2);
+		castAngle = (float) Math.IEEEremainder(castAngle + Clock.approach(0f, turn, 1.5f), Math.PI * 2);
+		castLength = Clock.approach(castLength, aimLength, 1.5f);
 		soft = Clock.approach(soft, aimSoft, 1.5f);
 		light = Clock.approach(light, aimLight, 1.5f);
 		night = Clock.approach(night, aimNight, 1f);
@@ -387,7 +418,7 @@ public final class ShadowPet extends CosmeticModule {
 			return;
 		}
 
-		double ground = grounded ? py : groundY;
+		double ground = grounded ? py + groundLift : groundY;
 		float height = (float) Math.max(0.0, py - ground);
 		// Higher up, the shadow gets smaller and fainter and is gone at about four blocks
 		float fade = Colors.clamp01(1f - height / 4f);
@@ -398,9 +429,9 @@ public final class ShadowPet extends CosmeticModule {
 		}
 
 		s /= 1f + 0.15f * height;
-		float stretch = Math.max(0.3f, (float) Math.sqrt(castX * castX + castZ * castZ));
-		float dirX = castX / stretch;
-		float dirZ = castZ / stretch;
+		float stretch = Math.max(0.3f, castLength);
+		float dirX = (float) Math.cos(castAngle);
+		float dirZ = (float) Math.sin(castAngle);
 		float sideX = -dirZ;
 		float sideZ = dirX;
 
@@ -469,8 +500,9 @@ public final class ShadowPet extends CosmeticModule {
 						gx[i] + edgeX[i] * width, baseY, gz[i] + edgeZ[i] * width, outer);
 			}
 
-			float eyeX = (k.eyeX + (k.eyeSitX - k.eyeX) * sit) * 0.01f * facing * s;
-			float eyeY = (k.eyeY + (k.eyeSitY - k.eyeY) * sit) * 0.01f * (1f - 0.28f * crouch) * stretch * s;
+			// Placed like the outline points, so the eye stays in the head while it bobs or ducks
+			float eyeX = (k.eyeX + (k.eyeSitX - k.eyeX) * sit) * 0.01f * (1f + 0.06f * crouch) * facing * s;
+			float eyeY = ((k.eyeY + (k.eyeSitY - k.eyeY) * sit) * 0.01f + bob(k, sit, walk, phase)) * (1f - 0.28f * crouch) * stretch * s;
 			float blink = (time % 4.7f) < 0.12f ? 0.1f : 1f;
 			geo.glowDot(px + sideX * eyeX + dirX * eyeY, ground + LIFT + 0.01, pz + sideZ * eyeX + dirZ * eyeY, 0.035f * s, rimRgb, rim * 0.8f * blink);
 		}
@@ -582,7 +614,7 @@ public final class ShadowPet extends CosmeticModule {
 		// No stepping while sitting down or getting up
 		float gait = walk * stand;
 		float air = Math.max(0f, (float) Math.sin(phase));
-		float bob = k.hops ? k.bob * gait * air : k.bob * gait * (0.5f - 0.5f * (float) Math.cos(phase * 2f));
+		float bob = bob(k, sit, walk, phase);
 		// Tail: a slow wave while idle, a quick bounce while walking; sitting it sweeps along the ground
 		float idle = 1f - walk;
 		float squash = 1f - 0.28f * crouch;
@@ -645,6 +677,17 @@ public final class ShadowPet extends CosmeticModule {
 		}
 
 		return n;
+	}
+
+	/** How far the body rises while walking: a hop for the bunny, a small bounce on every step for the others. */
+	private static float bob(Kind k, float sit, float walk, float phase) {
+		float gait = walk * (1f - sit);
+
+		if (k.hops) {
+			return k.bob * gait * Math.max(0f, (float) Math.sin(phase));
+		}
+
+		return k.bob * gait * (0.5f - 0.5f * (float) Math.cos(phase * 2f));
 	}
 
 	private static int put(float[] xs, float[] ys, int n, float x, float y) {
