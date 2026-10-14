@@ -227,6 +227,7 @@ public final class ShadowPet extends CosmeticModule {
 	public ShadowPet() {
 		super("shadow_pet", "Schattentier", "Dein Schatten am Boden wird zu einem Fuchs, einer Katze, einem kleinen Drachen oder einem Hasen. "
 				+ "Er läuft mit dir, setzt sich hin, wenn du stehst, und wird bei Sonnenuntergang lang. Auch in der Ego-Sicht zu sehen.");
+		keepOnGround();
 	}
 
 	@Override

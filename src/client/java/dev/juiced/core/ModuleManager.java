@@ -13,6 +13,7 @@ import dev.juiced.JuicedClient;
 import dev.juiced.modules.combat.HitEffects;
 import dev.juiced.modules.combat.HitSounds;
 import dev.juiced.modules.combat.KillEffects;
+import dev.juiced.modules.combat.KnockbackComet;
 import dev.juiced.modules.combat.TargetMarker;
 import dev.juiced.modules.combat.TotemPops;
 import dev.juiced.modules.cosmetic.Aura;
@@ -20,6 +21,7 @@ import dev.juiced.modules.cosmetic.Cape;
 import dev.juiced.modules.cosmetic.Ears;
 import dev.juiced.modules.cosmetic.FloatingBlades;
 import dev.juiced.modules.cosmetic.Pet;
+import dev.juiced.modules.cosmetic.ShadowPet;
 import dev.juiced.modules.cosmetic.Tail;
 import dev.juiced.modules.cosmetic.ConeHat;
 import dev.juiced.modules.cosmetic.Crown;
@@ -46,6 +48,7 @@ import dev.juiced.modules.tweaks.ExplosionTweaks;
 import dev.juiced.modules.tweaks.Freelook;
 import dev.juiced.modules.tweaks.Fullbright;
 import dev.juiced.modules.tweaks.HandView;
+import dev.juiced.modules.tweaks.HitDirection;
 import dev.juiced.modules.tweaks.LowFire;
 import dev.juiced.modules.tweaks.LowShield;
 import dev.juiced.modules.tweaks.ToggleSprint;
@@ -101,6 +104,7 @@ public final class ModuleManager {
 		register(new KillEffects());
 		register(new TargetMarker());
 		register(new TotemPops());
+		register(new KnockbackComet());
 		// Visuals
 		register(new DamageNumbers());
 		register(new JumpCircles());
@@ -142,11 +146,13 @@ public final class ModuleManager {
 		// Tweaks
 		register(new ExplosionTweaks());
 		register(ModuleGroup.bundle("clear_view", "Klare Sicht", Category.TWEAKS, true,
-				"Alles, was im Kampf die Sicht stört, an einem Ort: Overlays (Hurt-Cam, Totem, Kürbis, Portal, Wasser, Block), Low Fire, Low Shield und die Hand-Ansicht.")
+				"Alles, was im Kampf die Sicht stört, an einem Ort: Overlays (Hurt-Cam, Totem, Kürbis, Portal, Wasser, Block), Low Fire, Low Shield und die Hand-Ansicht. "
+						+ "Dazu zeigt ein Pinselbogen am Fadenkreuz, woher ein Treffer kam.")
 				.bundled("", ClearView::new, "Overlays ausblenden", "overlays")
 				.bundled("fire.", LowFire::new, "Low Fire", "low_fire")
 				.bundled("shield.", LowShield::new, "Low Shield", "low_shield")
 				.bundled("hand.", HandView::new, "Hand-Ansicht", "hand_view")
+				.bundled("hit_dir.", HitDirection::new, "Treffer-Richtung", "hit_direction")
 				.build());
 		register(new Trajectories());
 		register(new Zoom());
@@ -176,6 +182,7 @@ public final class ModuleManager {
 		register(new Ears());
 		register(new Tail());
 		register(new Pet());
+		register(new ShadowPet());
 		register(new FloatingBlades());
 		// HUD
 		register(new TargetHud());

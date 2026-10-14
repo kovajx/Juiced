@@ -4,16 +4,16 @@ Client-Mod für PvP-Visuals und Cosmetics. Alles läuft nur auf deinem Client un
 
 **Version:** Minecraft 26.3 · Fabric Loader 0.19.5+ · Fabric API 0.162.0+26.3 · Java 25
 
-## Module (47 Karten)
+## Module (49 Karten)
 
 Zusammengehörige Sachen liegen auf einer gemeinsamen Karte. Auf der Rückseite wählst du die Art oder schaltest die Teile einzeln an.
 
 | Kategorie | Karten |
 |---|---|
-| **Combat** | Treffer (Effekte + Hit-Sounds) · Kill-Effekte · Target-Marker · Totem-Pops |
+| **Combat** | Treffer (Effekte + Hit-Sounds) · Kill-Effekte · Target-Marker · Totem-Pops · Rückstoß-Komet |
 | **Visuals** | Schadenszahlen (3D) · Jump Circles · Trails (dein Trail + Projektile) · Block-Umrandung · Fadenkreuz · Bildeffekte (Sättigung, Motion Blur) · Fußspuren (Leuchtend, Wasserringe, Blumen, Pfoten, Wolken) · Atmosphäre (Glühwürmchen, Laternen, Schmetterlinge, Sternschnuppen, Pusteblumen, Kirschblüten, Herbstlaub, Lavendel, Rosen, Schnee …) · Koi-Teich · Himmel (Polarlicht, Sternbilder, Vogelschwärme) · Umgebung (Zen-Garten, Regen & Pfützen, Atemwolken, Lichter & Lagerfeuer, Jukebox-Noten, Fallende Blätter, Sonnenstrahlen, Wassertropfen) · Angel-Moment |
-| **Tweaks** | Explosionen aus (Kristalle/Anker/TNT) · Klare Sicht (Overlays, Low Fire, Low Shield, Hand-Ansicht) · Flugbahn · Zoom (C) · Sanfte Oberfläche (Weiche Hotbar, Inventar-Animationen) · Zen-Modus · Freelook (Linke Alt) · Toggle Sprint · Fullbright |
-| **Cosmetics** | Kopf (Halo, Krone, China-Hut, Blumenkranz, Strohhut, Kopfhörer, Zylinder, Zauberhut, Kristall, Mondsichel, Regenwolke) · Rücken (Cape mit Physik, Engels-, Schmetterlings-, Papier-, Drachen-, Energieflügel) · Aura (u. a. Magiekreis, Glühwürmchen, Blütenwirbel, Musiknoten, Seifenblasen) · Ohren & Hörner (8 Arten) · Schweif mit Physik (u. a. Kitsune, Sternenschweif) · Begleiter (12 Arten, u. a. Orb, Qualle, Himmelswal, Papierkranich, Axolotl, Fee, Koi-Blase) · Schwebende Klingen (Schwert, Axt, Dreizack) |
+| **Tweaks** | Explosionen aus (Kristalle/Anker/TNT) · Klare Sicht (Overlays, Low Fire, Low Shield, Hand-Ansicht, Treffer-Richtung) · Flugbahn · Zoom (C) · Sanfte Oberfläche (Weiche Hotbar, Inventar-Animationen) · Zen-Modus · Freelook (Linke Alt) · Toggle Sprint · Fullbright |
+| **Cosmetics** | Kopf (Halo, Krone, China-Hut, Blumenkranz, Strohhut, Kopfhörer, Zylinder, Zauberhut, Kristall, Mondsichel, Regenwolke) · Rücken (Cape mit Physik; Flügel mit echtem Flügelskelett: Engel, Drache, Energie, Schmetterling, Papier) · Aura (u. a. Magiekreis, Glühwürmchen, Blütenwirbel, Musiknoten, Seifenblasen) · Ohren & Hörner (8 Arten) · Schweif mit Physik (u. a. Kitsune, Sternenschweif) · Begleiter (12 Arten, u. a. Orb, Qualle, Himmelswal, Papierkranich, Axolotl, Fee, Koi-Blase) · Schattentier (Fuchs, Katze, Drache, Hase) · Schwebende Klingen (Schwert, Axt, Dreizack) |
 | **HUD** | Target-HUD · Keystrokes + CPS · Info (FPS, Ping, XYZ, Richtung, Tempo, Uhr, Server) · Rüstungs-HUD · Effekt-HUD · Item-Zähler · Cooldowns · Totem-Warnung · Reach · Session-Stats · Kompass · Angriffs-Anzeige · Low-HP-Warnung |
 | **System** | Theme (Farben, HUD-Hintergrund) · Leistung |
 
@@ -26,6 +26,9 @@ Im Menü oben rechts auf **„♛ Garderobe“**:
 - Links die Slots: Kopf, Ohren, Rücken, Schweif, Begleiter, Klingen, Aura. Rechts wählst du, was du trägst, und stellst Farbe, Größe usw. ein.
 - **↑ ↓** wechselt den Slot, **← →** blättert durch die Teile.
 - **Outfits:** „+“ speichert deinen kompletten Look in einem von vier Plätzen, „Laden“ zieht ihn mit einem Klick wieder an.
+- **Position:** Jedes Cosmetic hat am Ende seiner Einstellungen die Regler „Höhe“, „Vorne/Hinten“ und „Links/Rechts“ und einen Knopf zum Zurücksetzen. So passt es zu deinem Skin und zu anderen Cosmetics. Sachen auf dem Kopf verschieben sich entlang des Kopfes und bleiben auch beim Hoch- und Runterschauen dort, wo du sie hingestellt hast.
+- **Kopfschmuck sitzt fest:** China-Hut, Krone, Hüte, Kopfhörer und Ohren drehen und neigen sich mit deinem Kopf, auch beim Schleichen, und liegen auf den Haaren deines Skins. Halo, Kristall, Mondsichel und Regenwolke schweben waagerecht über deinem Kopf und folgen ihm.
+- **Flügel:** Alle fünf Stile haben ein echtes Flügelskelett mit Schulter, Ellbogen und Handgelenk. Im Stand sind sie halb angelegt und atmen leicht, in der Luft schlagen sie weit offen, beim Schleichen liegen sie eng an. Wie weit sie im Stand offen sind, stellst du mit „Öffnung im Stand“ ein.
 
 ## Zum Entspannen
 
@@ -34,6 +37,15 @@ Im Menü oben rechts auf **„♛ Garderobe“**:
 - **Fußspuren:** Wasserringe wie auf einem stillen See, aufblühende Blumen, Pfotenabdrücke oder kleine Wölkchen.
 - **Begleiter:** eine leuchtende Qualle, ein kleiner Himmelswal, der hoch über dir seine Kreise zieht, ein Papierkranich oder ein Axolotl.
 - **Lo-Fi:** Kopfhörer, aus denen Musiknoten aufsteigen, oder eine Aura aus Musiknoten bzw. Seifenblasen.
+
+## Schattentier
+
+Dein Schatten am Boden wird zu einem Fuchs, einer Katze, einem kleinen Drachen oder einem Hasen. Er fällt immer von der Sonne weg, mittags kurz und bei Sonnenuntergang lang. Nachts wirft der Mond einen blassen Schatten, auf Wunsch mit leuchtendem Rand. Läufst du, läuft er mit. Bleibst du stehen, setzt er sich hin und wedelt mit dem Schweif. Du siehst ihn auch in der Ego-Sicht, wenn du nach unten schaust.
+
+## Kampf-Feedback
+
+- **Rückstoß-Komet:** Nach deinem Treffer zieht der Gegner einen kurzen Schweif. Gold heißt voller Sprint-Rückstoß, blau heißt verschenkt. Beim Landen siehst du einen Staubring und die Weite in Blöcken (gemessen auf deinem Client, also eine gute Schätzung). So lernst du W-Tapping nebenbei.
+- **Treffer-Richtung** (auf der Karte „Klare Sicht“): Ein Tuschebogen am Fadenkreuz zeigt, woher ein Treffer kam, und verblasst wie Tinte. Rot steht für Nahkampf, weiß für Geschosse, orange für Feuer und bernsteinfarben für Explosionen. Er nutzt nur die Richtung, die auch die Hurt-Cam bekommt, und passt gut dazu, wenn die Hurt-Cam aus ist.
 
 ## Himmel
 
@@ -114,7 +126,7 @@ Im Menü oben rechts auf **„✛ HUD bearbeiten“**:
 
 Am einfachsten: **`bauen-und-installieren.bat`** doppelklicken. Das baut die Mod und ersetzt die alte Juiced-Version im Modrinth-Profil „Fabric 26.3“.
 
-Von Hand: `gradlew.bat build` (Windows) oder `./gradlew build`. Die Mod liegt dann in `build/libs/juiced-2.6.0.jar`. Zusammen mit Fabric API in den `mods`-Ordner legen, und dort nur eine Juiced-Jar behalten.
+Von Hand: `gradlew.bat build` (Windows) oder `./gradlew build`. Die Mod liegt dann in `build/libs/juiced-2.7.0.jar`. Zusammen mit Fabric API in den `mods`-Ordner legen, und dort nur eine Juiced-Jar behalten.
 
 Auf GitHub baut **GitHub Actions** die Mod bei jedem Push. Die fertige Jar liegt beim jeweiligen Lauf unter „Artifacts“.
 

@@ -53,6 +53,7 @@ public abstract class CosmeticModule extends Module {
 	private final SliderSetting offsetUp;
 	private final SliderSetting offsetForward;
 	private final SliderSetting offsetSide;
+	private boolean onGround;
 	// This frame's position offset in the world, already added to px/py/pz
 	private double shiftX;
 	private double shiftY;
@@ -72,6 +73,12 @@ public abstract class CosmeticModule extends Module {
 	protected <S extends Setting<?>> S add(S setting) {
 		settings.add(settings.indexOf(offsetUp), setting);
 		return setting;
+	}
+
+	/** For cosmetics that lie on the ground (the shadow pet): no height slider, they only move sideways. */
+	protected final void keepOnGround() {
+		onGround = true;
+		offsetUp.showIf(() -> false);
 	}
 
 	private void resetPosition() {
@@ -136,7 +143,7 @@ public abstract class CosmeticModule extends Module {
 		float forward = offsetForward.f();
 		float side = offsetSide.f();
 		shiftX = 0;
-		shiftY = offsetUp.f();
+		shiftY = onGround ? 0 : offsetUp.f();
 		shiftZ = 0;
 
 		if (forward != 0f || side != 0f) {
