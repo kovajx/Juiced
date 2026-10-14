@@ -53,6 +53,11 @@ public final class PostEffect {
 			// Without the field we can't see whether the game cleared it, so set it again each time
 			if (current == null || !effect.equals(now)) {
 				set.invoke(renderer, effect);
+
+				// The field was only a guess: if it doesn't hold what we just set, stop trusting it
+				if (current != null && !effect.equals(current.get(renderer))) {
+					current = null;
+				}
 			}
 
 			applied = effect;
