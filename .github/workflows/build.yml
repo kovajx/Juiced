@@ -23,41 +23,6 @@ jobs:
           chmod +x gradlew
           ./gradlew build --stacktrace
 
-      # Temporary: prints Minecraft API signatures used as a reference while writing new features
-      - name: API reference
-        continue-on-error: true
-        run: |
-          LOOM=~/.gradle/caches/fabric-loom/26.3
-          CP=$(find $LOOM -maxdepth 1 -name 'minecraft-*.jar' | tr '\n' ':')
-          for c in \
-            net.minecraft.world.entity.Entity \
-            net.minecraft.world.entity.LivingEntity \
-            net.minecraft.world.entity.player.Player \
-            net.minecraft.client.player.LocalPlayer \
-            net.minecraft.client.player.AbstractClientPlayer \
-            net.minecraft.world.damagesource.DamageSource \
-            net.minecraft.tags.DamageTypeTags \
-            'net.minecraft.world.level.block.state.BlockBehaviour$BlockStateBase' \
-            net.minecraft.world.phys.shapes.VoxelShape \
-            net.minecraft.client.multiplayer.ClientLevel \
-            net.minecraft.world.level.Level \
-            net.minecraft.client.Minecraft \
-            net.minecraft.client.gui.GuiGraphicsExtractor \
-            net.minecraft.client.renderer.entity.state.LivingEntityRenderState \
-            net.minecraft.client.renderer.entity.state.AvatarRenderState \
-            net.minecraft.client.renderer.entity.state.HumanoidRenderState \
-            net.minecraft.client.model.HumanoidModel \
-            net.minecraft.client.renderer.entity.player.AvatarRenderer \
-            net.minecraft.world.attribute.EnvironmentAttributes ; do
-            echo "=== API $c"
-            javap -p -cp "$CP" "$c" || true
-          done
-          echo "=== BYTECODE HumanoidModel"
-          javap -c -p -cp "$CP" net.minecraft.client.model.HumanoidModel | grep -nE "crouch|isCrouching|ldc|fconst|putfield|getfield .*(head|body|hat)|Method .*setupAnim|^  (public|protected|private)" | head -400 || true
-          echo "=== BYTECODE AvatarRenderer"
-          javap -c -p -cp "$CP" net.minecraft.client.renderer.entity.player.AvatarRenderer | grep -nE "getRenderOffset|isCrouching|ldc|fconst|Vec3|^  (public|protected|private)" | head -200 || true
-          echo "=== API END"
-
       - uses: actions/upload-artifact@v4
         with:
           name: juiced
