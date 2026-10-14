@@ -1,0 +1,30 @@
+{
+	"schemaVersion": 1,
+	"id": "juiced",
+	"version": "${version}",
+	"name": "Juiced",
+	"description": "PvP visuals and cosmetics: hit and kill effects, jump circles, trails, target HUD, halos, wings and more. Client-side, lightweight, works on any server.",
+	"authors": [
+		"Muvin"
+	],
+	"license": "All-Rights-Reserved",
+	"icon": "assets/juiced/icon.png",
+	"environment": "client",
+	"entrypoints": {
+		"client": [
+			"dev.juiced.JuicedClient"
+		]
+	},
+	"mixins": [
+		{
+			"config": "juiced.client.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=0.19.5",
+		"minecraft": "~26.3",
+		"java": ">=25",
+		"fabric-api": "*"
+	}
+}

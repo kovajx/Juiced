@@ -1,0 +1,31 @@
+{
+	"required": true,
+	"package": "dev.juiced.mixin",
+	"compatibilityLevel": "JAVA_25",
+	"client": [
+		"AbstractContainerScreenMixin",
+		"CameraMixin",
+		"CapeLayerMixin",
+		"ClientPacketListenerMixin",
+		"EntityMixin",
+		"EntityRendererMixin",
+		"FirstPersonHandsAndItemsRendererMixin",
+		"FishingHookAccessor",
+		"GameRendererMixin",
+		"HudHotbarMixin",
+		"HudMixin",
+		"KeyboardHandlerMixin",
+		"LightmapMixin",
+		"LivingEntityMixin",
+		"LocalPlayerMixin",
+		"MouseHandlerMixin",
+		"ParticleEngineMixin",
+		"ScreenEffectRendererMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	},
+	"overwrites": {
+		"requireAnnotations": true
+	}
+}
