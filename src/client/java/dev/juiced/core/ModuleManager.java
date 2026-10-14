@@ -71,6 +71,7 @@ import dev.juiced.modules.visual.ScreenDrops;
 import dev.juiced.modules.visual.ZenGarden;
 import dev.juiced.modules.visual.Petals;
 import dev.juiced.modules.visual.ProjectileTrails;
+import dev.juiced.modules.visual.ScreenEffects;
 import dev.juiced.modules.visual.Trails;
 import dev.juiced.render.Geo;
 
@@ -106,6 +107,7 @@ public final class ModuleManager {
 				.build());
 		register(new BlockOutline());
 		register(new CustomCrosshair());
+		register(new ScreenEffects());
 		register(new Footprints());
 		register(ModuleGroup.choice("ambient", "Atmosphäre", Category.VISUALS,
 				"Ruhige Stimmung um dich herum: Glühwürmchen, Laternen, Schmetterlinge, Kirschblüten, Herbstlaub, Lavendel, Rosen, Schnee, Sternschnuppen, Pusteblumen und mehr.")
