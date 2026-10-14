@@ -11,14 +11,17 @@ import net.minecraft.world.level.Level;
 import dev.juiced.JuicedClient;
 
 /**
- * How much day or night it is right now, read from the same sky values the game uses for its own
- * sky (star brightness and sky light). The values are looked up by name once; if one is missing in
- * this Minecraft version, the effects that need it fall back as described below.
+ * How much day or night it is right now and where the sun and moon stand, read from the same sky
+ * values the game uses for its own sky (star brightness, sky light, sun and moon angle). The values
+ * are looked up by name once; if one is missing in this Minecraft version, the effects that need it
+ * fall back as described below.
  */
 public final class Sky {
 	private static boolean looked;
 	private static @Nullable EnvironmentAttribute<?> starBrightness;
 	private static @Nullable EnvironmentAttribute<?> skyLight;
+	private static @Nullable EnvironmentAttribute<?> sunAngle;
+	private static @Nullable EnvironmentAttribute<?> moonAngle;
 
 	private Sky() {
 	}
@@ -42,6 +45,21 @@ public final class Sky {
 		return Math.max(0f, Math.min(1f, (value(level, skyLight, pos, 1f) - 0.24f) / 0.76f));
 	}
 
+	/**
+	 * Where the sun stands, in degrees: 0 at noon (straight up), 90 at sunset (west, -X), 180 at
+	 * midnight and 270 at sunrise (east, +X). NaN if the game doesn't tell us.
+	 */
+	public static float sunAngle(ClientLevel level, BlockPos pos) {
+		lookUp();
+		return value(level, sunAngle, pos, Float.NaN);
+	}
+
+	/** Where the moon stands, in degrees, counted the same way as {@link #sunAngle}. NaN if the game doesn't tell us. */
+	public static float moonAngle(ClientLevel level, BlockPos pos) {
+		lookUp();
+		return value(level, moonAngle, pos, Float.NaN);
+	}
+
 	private static float value(ClientLevel level, @Nullable EnvironmentAttribute<?> attribute, BlockPos pos, float fallback) {
 		if (attribute == null) {
 			return fallback;
@@ -59,6 +77,8 @@ public final class Sky {
 		looked = true;
 		starBrightness = attribute("STAR_BRIGHTNESS");
 		skyLight = attribute("SKY_LIGHT_FACTOR");
+		sunAngle = attribute("SUN_ANGLE");
+		moonAngle = attribute("MOON_ANGLE");
 	}
 
 	private static @Nullable EnvironmentAttribute<?> attribute(String name) {
