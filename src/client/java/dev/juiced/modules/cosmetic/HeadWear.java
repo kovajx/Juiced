@@ -88,10 +88,19 @@ public final class HeadWear extends CosmeticModule {
 		return 1 / Math.pow(Math.pow(Math.abs(Math.sin(a)), 8) + Math.pow(Math.abs(Math.cos(a)), 8), 1 / 8.0);
 	}
 
+	/**
+	 * Height above the neck for the middle of a hat brim with this half thickness. The brim's top clears
+	 * the hair on the skin's outer layer, so the hair never pokes through it, and its bottom stays on the
+	 * head, so the hat doesn't float on skins without hair there.
+	 */
+	private static float brimHeight(float halfThickness) {
+		return Math.max(HEAD_TOP + halfThickness, HAIR_TOP + 0.003f - halfThickness);
+	}
+
 	private void topHat(Geo geo, float s) {
 		int body = main(0x24242C);
 		int band = accent.rgb();
-		Pose3 hat = headPose().move(0, HEAD_TOP + 0.012, 0);
+		Pose3 hat = headPose().move(0, brimHeight(0.012f * s), 0);
 		geo.beginModel();
 		geo.box(hat, 0.36f * s, 0.012f * s, 0.36f * s, body, 1f);
 		geo.box(hat.copy().move(0, 0.03 * s, 0), 0.215f * s, 0.022f * s, 0.215f * s, band, 1f);
@@ -103,7 +112,7 @@ public final class HeadWear extends CosmeticModule {
 	private void wizardHat(Geo geo, float s, float time) {
 		int body = main(0x5B3FA8);
 		int trim = accent.rgb();
-		Pose3 hat = headPose().move(0, HEAD_TOP + 0.01, 0);
+		Pose3 hat = headPose().move(0, brimHeight(0.01f * s), 0);
 		geo.beginModel();
 		geo.box(hat, 0.4f * s, 0.01f * s, 0.4f * s, body, 1f);
 		geo.box(hat.copy().move(0, 0.03 * s, 0), 0.25f * s, 0.022f * s, 0.25f * s, trim, 1f);
@@ -173,7 +182,7 @@ public final class HeadWear extends CosmeticModule {
 	private void strawHat(Geo geo, float s, float time) {
 		int straw = main(0xE8C77A);
 		int ribbon = accent.get() == Colors.GOLD ? 0xC8423A : accent.rgb();
-		Pose3 head = headPose().move(0, HEAD_TOP + 0.01, 0);
+		Pose3 head = headPose().move(0, brimHeight(0.008f * s), 0);
 		// Brim: a flat round disc. Turned so the polygon lies flat
 		int points = 16;
 		float[] xs = new float[points];
@@ -190,10 +199,11 @@ public final class HeadWear extends CosmeticModule {
 		geo.box(head.copy().move(0, 0.07 * s, 0), 0.2f * s, 0.07f * s, 0.2f * s, Colors.shade(straw, 0.05f), 1f);
 		geo.box(head.copy().move(0, 0.025 * s, 0), 0.205f * s, 0.022f * s, 0.205f * s, ribbon, 1f);
 		geo.box(head.copy().move(0, 0.145 * s, 0), 0.17f * s, 0.008f * s, 0.17f * s, Colors.shade(straw, 0.12f), 1f);
-		// Ribbon ends fluttering at the back
+		// Ribbon ends fluttering at the back, just behind the head so they don't hang inside it
 		float flutter = (float) Math.sin(time * 3f) * 8f;
-		geo.box(head.copy().move(0.05 * s, 0.0, -0.215 * s).roll(15 + flutter).move(0, -0.05 * s, 0), 0.018f * s, 0.05f * s, 0.004f * s, ribbon, 1f);
-		geo.box(head.copy().move(-0.04 * s, 0.0, -0.215 * s).roll(-10 - flutter).move(0, -0.045 * s, 0), 0.018f * s, 0.045f * s, 0.004f * s, ribbon, 1f);
+		double back = -Math.max(0.215 * s, HEAD_OUTER + 0.008);
+		geo.box(head.copy().move(0.05 * s, 0.0, back).roll(15 + flutter).move(0, -0.05 * s, 0), 0.018f * s, 0.05f * s, 0.004f * s, ribbon, 1f);
+		geo.box(head.copy().move(-0.04 * s, 0.0, back).roll(-10 - flutter).move(0, -0.045 * s, 0), 0.018f * s, 0.045f * s, 0.004f * s, ribbon, 1f);
 		geo.endModel();
 	}
 

@@ -31,7 +31,7 @@ public final class ConeHat extends CosmeticModule {
 		// Sits on the head and tilts with it. The slope just clears the corners of the outer skin layer;
 		// a hat smaller than the head rests on top of it instead.
 		float corner = HEAD_OUTER * 1.4142f;
-		float lift = HEAD_TOP / 2 + HEAD_OUTER + 0.006f - peak * Math.max(0f, 1f - corner / radius);
+		float lift = HAIR_TOP + 0.006f - peak * Math.max(0f, 1f - corner / radius);
 		Pose3 hat = headPose().move(0, lift, 0);
 		int segments = Theme.detail(32);
 		float time = Clock.tf();
