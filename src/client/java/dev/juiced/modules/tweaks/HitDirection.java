@@ -1,7 +1,10 @@
 package dev.juiced.modules.tweaks;
 
+import java.util.Arrays;
+
 import org.jspecify.annotations.Nullable;
 
+import net.minecraft.client.CameraType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.player.LocalPlayer;
@@ -17,6 +20,7 @@ import dev.juiced.core.Previews;
 import dev.juiced.core.Theme;
 import dev.juiced.core.setting.BoolSetting;
 import dev.juiced.core.setting.SliderSetting;
+import dev.juiced.render.FreeCamera;
 import dev.juiced.render.Gui2D;
 
 /**
@@ -34,7 +38,10 @@ public final class HitDirection extends Module {
 	private static final float SPAN = (float) Math.toRadians(76);
 	/** The brush is drawn in half GUI pixels so its edges stay fine. */
 	private static final float SUB = 2f;
-	/** Where along the stroke the brush presses hardest; this part sits on the hit direction. */
+	/**
+	 * The point along the stroke that sits on the hit direction: between where the brush presses hardest
+	 * (0.18) and the middle of the ink (0.42), so the arc reads as centered on it.
+	 */
 	private static final float BELLY = 0.3f;
 	private static final float DRAW_SECONDS = 0.12f;
 	/** Two hurt signals this close together are one hit (damage and hurt-animation packets can arrive a tick apart). */
@@ -46,10 +53,14 @@ public final class HitDirection extends Module {
 	private static final int EXPLOSION = 0xFFB020;
 	private static final int OTHER = 0xA3A3AE;
 
+	// Card preview: hits from the left, from behind and from the right (sword, arrow, fireball)
+	private static final float[] PREVIEW_ANGLES = {-1.75f, 3.0f, 1.4f};
+	private static final int[] PREVIEW_COLORS = {MELEE, PROJECTILE, FIRE};
+
 	private final SliderSetting size = add(SliderSetting.percent("size", "Größe", 0.5, 2.0, 1.0));
 	private final SliderSetting duration = add(new SliderSetting("duration", "Dauer", 0.6, 2.5, 0.1, 1.2, v -> String.format("%.1fs", v)));
 	private final SliderSetting opacity = add(SliderSetting.percent("opacity", "Deckkraft", 0.2, 1.0, 0.85));
-	private final BoolSetting undirected = add(new BoolSetting("undirected", "Ohne Richtung als Kreis", false));
+	private final BoolSetting undirected = add(new BoolSetting("undirected", "Schaden ohne Richtung als Kreis", false));
 
 	// One slot per arc. yaw is the world yaw you would face to look at where the hit came from.
 	private final float[] yaw = new float[MAX];
@@ -70,7 +81,7 @@ public final class HitDirection extends Module {
 	public HitDirection() {
 		super("hit_direction", "Treffer-Richtung", Category.TWEAKS, true,
 				"Ein Pinselbogen am Fadenkreuz zeigt, woher ein Treffer kam, und verblasst wie Tinte. Rot für Nahkampf, weiß für Geschosse, "
-						+ "orange für Feuer, bernstein für Explosionen. Nutzt nur die Richtung, die auch die Hurt-Cam bekommt.");
+						+ "orange für Feuer, bernsteinfarben für Explosionen. Nutzt nur die Richtung, die auch die Hurt-Cam bekommt.");
 	}
 
 	@Override
@@ -184,7 +195,13 @@ public final class HitDirection extends Module {
 
 		double now = Clock.t();
 		float life = duration.f();
-		float viewYaw = player.getYRot(hud.partialTick);
+		// Relative to the camera, so the arc stays right while looking around with Freelook or in front view
+		float viewYaw = FreeCamera.cameraYaw(player.getYRot(hud.partialTick));
+
+		if (hud.minecraft.options.getCameraType() == CameraType.THIRD_PERSON_FRONT) {
+			viewYaw += 180f;
+		}
+
 		float cx = hud.centerX() + 0.5f;
 		float cy = hud.centerY() + 0.5f;
 
@@ -232,6 +249,9 @@ public final class HitDirection extends Module {
 		float arcStep = r * span / steps;
 		int ink = Colors.shade(rgb, -0.08f);
 		int bleed = Colors.shade(rgb, -0.6f);
+		// Light inks (arrows, gray) get a stronger dark rim so they still read against a bright sky or snow
+		float light = (((rgb >> 16) & 0xFF) * 0.3f + ((rgb >> 8) & 0xFF) * 0.59f + (rgb & 0xFF) * 0.11f) / 255f;
+		float rim = 0.12f + 0.22f * light * light;
 		float wobblePhase = ((seed >>> 8) & 0xFF) / 40f;
 
 		g.pose().pushMatrix();
@@ -270,7 +290,7 @@ public final class HitDirection extends Module {
 			// Bleed: a faint dark rim that slowly spreads as the ink dries
 			if (i % 2 == 0 && u < 0.8f) {
 				float spread = w * (1.6f + fade * 0.9f);
-				Gui2D.dot(g, x, y, spread, Colors.argb(a * 0.12f * (1f - u * 0.6f), bleed));
+				Gui2D.dot(g, x, y, spread, Colors.argb(a * rim * (1f - u * 0.6f), bleed));
 			}
 
 			// Dabs overlap; this alpha makes the overlap add up to roughly 'a'
@@ -333,7 +353,7 @@ public final class HitDirection extends Module {
 
 	@Override
 	protected void onDisable() {
-		java.util.Arrays.fill(alive, false);
+		Arrays.fill(alive, false);
 		primed = false;
 		newest = -1;
 	}
@@ -346,14 +366,11 @@ public final class HitDirection extends Module {
 		Gui2D.fill(g, Math.round(cx) - 4, Math.round(cy), Math.round(cx) + 5, Math.round(cy) + 1, cross);
 		Gui2D.fill(g, Math.round(cx), Math.round(cy) - 4, Math.round(cx) + 1, Math.round(cy) + 5, cross);
 
-		// Hits from the left, from behind and from the right: sword, arrow, fireball
 		float period = 1.5f;
 		int index = (int) (time / period);
 		float age = Previews.cycle(time, period) * period;
-		float[] angles = {-1.75f, 3.0f, 1.4f};
-		int[] colors = {MELEE, PROJECTILE, FIRE};
-		int k = Math.floorMod(index, 3);
+		int k = Math.floorMod(index, PREVIEW_ANGLES.length);
 		float radius = Math.min(w, h) * 0.34f;
-		stroke(g, cx, cy, radius, angles[k], SPAN, 1f, colors[k], 0.95f, age, period, 7 + k * 0x3F1);
+		stroke(g, cx, cy, radius, PREVIEW_ANGLES[k], SPAN, 1f, PREVIEW_COLORS[k], 0.95f, age, period, 7 + k * 0x3F1);
 	}
 }

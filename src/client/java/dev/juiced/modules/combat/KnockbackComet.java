@@ -33,6 +33,11 @@ public final class KnockbackComet extends Module {
 	/** One position per tick, enough for the whole flight. */
 	private static final int SAMPLES = 34;
 	private static final int FLIGHT_TICKS = 30;
+	/**
+	 * With lag the knockback can show up several ticks after the hit (another player's knockback makes a
+	 * round trip through their client first). A target that hasn't moved by then took none, so stop quietly.
+	 */
+	private static final int STILL_TICKS = 16;
 	/** After touchdown the drawn position still glides towards the server's for a tick or two. */
 	private static final int SETTLE_TICKS = 3;
 	private static final float TAIL_SECONDS = 0.32f;
@@ -117,6 +122,12 @@ public final class KnockbackComet extends Module {
 				continue;
 			}
 
+			// onHit runs earlier in this same client tick and already took the first sample
+			if (comet.fresh) {
+				comet.fresh = false;
+				continue;
+			}
+
 			comet.ticks++;
 			comet.record(entity, now);
 			boolean onGround = entity.onGround();
@@ -125,13 +136,16 @@ public final class KnockbackComet extends Module {
 				comet.airborne = true;
 			}
 
+			double moved = comet.moved();
+
 			if (comet.settle > 0) {
 				if (--comet.settle == 0 || comet.lastStep() < 0.03) {
 					land(comet, entity, now);
 				}
-			} else if (onGround && (comet.airborne || (comet.ticks >= 6 && comet.lastStep() < 0.01))) {
+			} else if (onGround && (comet.airborne || (moved > 0.4 && comet.lastStep() < 0.01))) {
+				// Landed, or slid to a stop without leaving the ground (low ceiling)
 				comet.settle = SETTLE_TICKS;
-			} else if (comet.ticks >= FLIGHT_TICKS) {
+			} else if (comet.ticks >= FLIGHT_TICKS || (!comet.airborne && moved < 0.15 && comet.ticks >= STILL_TICKS)) {
 				comet.cut(now);
 			} else if (Theme.quality() > 0 && comet.lastStep() > 0.08) {
 				sparkle(comet, entity);
@@ -161,9 +175,7 @@ public final class KnockbackComet extends Module {
 		comet.endY = entity.getY();
 		comet.endZ = entity.getZ();
 		comet.entity = null;
-		double dx = comet.endX - comet.startX;
-		double dz = comet.endZ - comet.startZ;
-		comet.label = String.format(Locale.ROOT, "%.1f", Math.sqrt(dx * dx + dz * dz));
+		comet.label = String.format(Locale.ROOT, "%.1f", comet.flown());
 
 		// Dust kicked up along the ground
 		ThreadLocalRandom random = ThreadLocalRandom.current();
@@ -294,7 +306,8 @@ public final class KnockbackComet extends Module {
 
 		if (showDistance.on()) {
 			float pop = t < 0.06f ? 1.45f - t / 0.06f * 0.45f : 1f;
-			geo.pixelText(comet.endX, comet.endY + comet.height + 0.45 + Clock.easeOut(t) * 0.25, comet.endZ,
+			// Above where a player's name tag sits, so the two don't overlap
+			geo.pixelText(comet.endX, comet.endY + comet.height + 0.85 + Clock.easeOut(t) * 0.2, comet.endZ,
 					comet.label, 0.055f * pop, color(comet, 0f), mark, true);
 		}
 	}
@@ -361,6 +374,7 @@ public final class KnockbackComet extends Module {
 		final double[] time = new double[SAMPLES];
 		@Nullable LivingEntity entity;
 		boolean active;
+		boolean fresh;
 		boolean flying;
 		boolean airborne;
 		boolean landed;
@@ -382,6 +396,7 @@ public final class KnockbackComet extends Module {
 		void start(LivingEntity target, boolean sprintHit, double now) {
 			entity = target;
 			active = true;
+			fresh = true;
 			flying = true;
 			landed = false;
 			airborne = !target.onGround();
@@ -418,6 +433,30 @@ public final class KnockbackComet extends Module {
 			double dx = x[count - 1] - x[count - 2];
 			double dz = z[count - 1] - z[count - 2];
 			return Math.sqrt(dx * dx + dz * dz);
+		}
+
+		/** Horizontal distance from the hit position to the newest sample. */
+		double moved() {
+			double dx = x[count - 1] - startX;
+			double dz = z[count - 1] - startZ;
+			return Math.sqrt(dx * dx + dz * dz);
+		}
+
+		/**
+		 * Horizontal distance from the point of the path farthest back to where it landed. Usually that is
+		 * the hit position, but with lag a player keeps running at you until their knockback arrives, and
+		 * the flight starts where they turned around.
+		 */
+		double flown() {
+			double best = 0;
+
+			for (int i = 0; i < count; i++) {
+				double dx = endX - x[i];
+				double dz = endZ - z[i];
+				best = Math.max(best, dx * dx + dz * dz);
+			}
+
+			return Math.sqrt(best);
 		}
 
 		void cut(double now) {
