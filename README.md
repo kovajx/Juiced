@@ -4,14 +4,14 @@ Client-Mod für PvP-Visuals und Cosmetics. Alles läuft nur auf deinem Client un
 
 **Version:** Minecraft 26.3 · Fabric Loader 0.19.5+ · Fabric API 0.162.0+26.3 · Java 25
 
-## Module (45 Karten)
+## Module (47 Karten)
 
 Zusammengehörige Sachen liegen auf einer gemeinsamen Karte. Auf der Rückseite wählst du die Art oder schaltest die Teile einzeln an.
 
 | Kategorie | Karten |
 |---|---|
 | **Combat** | Treffer (Effekte + Hit-Sounds) · Kill-Effekte · Target-Marker · Totem-Pops |
-| **Visuals** | Schadenszahlen (3D) · Jump Circles · Trails (dein Trail + Projektile) · Block-Umrandung · Fadenkreuz · Fußspuren (Leuchtend, Wasserringe, Blumen, Pfoten, Wolken) · Atmosphäre (Glühwürmchen, Laternen, Schmetterlinge, Sternschnuppen, Pusteblumen, Kirschblüten, Herbstlaub, Lavendel, Rosen, Schnee …) · Koi-Teich · Umgebung (Zen-Garten, Regen & Pfützen, Atemwolken, Lichter & Lagerfeuer, Jukebox-Noten, Fallende Blätter, Wassertropfen) · Angel-Moment |
+| **Visuals** | Schadenszahlen (3D) · Jump Circles · Trails (dein Trail + Projektile) · Block-Umrandung · Fadenkreuz · Bildeffekte (Sättigung, Motion Blur) · Fußspuren (Leuchtend, Wasserringe, Blumen, Pfoten, Wolken) · Atmosphäre (Glühwürmchen, Laternen, Schmetterlinge, Sternschnuppen, Pusteblumen, Kirschblüten, Herbstlaub, Lavendel, Rosen, Schnee …) · Koi-Teich · Himmel (Polarlicht, Sternbilder, Vogelschwärme) · Umgebung (Zen-Garten, Regen & Pfützen, Atemwolken, Lichter & Lagerfeuer, Jukebox-Noten, Fallende Blätter, Sonnenstrahlen, Wassertropfen) · Angel-Moment |
 | **Tweaks** | Explosionen aus (Kristalle/Anker/TNT) · Klare Sicht (Overlays, Low Fire, Low Shield, Hand-Ansicht) · Flugbahn · Zoom (C) · Sanfte Oberfläche (Weiche Hotbar, Inventar-Animationen) · Zen-Modus · Freelook (Linke Alt) · Toggle Sprint · Fullbright |
 | **Cosmetics** | Kopf (Halo, Krone, China-Hut, Blumenkranz, Strohhut, Kopfhörer, Zylinder, Zauberhut, Kristall, Mondsichel, Regenwolke) · Rücken (Cape mit Physik, Engels-, Schmetterlings-, Papier-, Drachen-, Energieflügel) · Aura (u. a. Magiekreis, Glühwürmchen, Blütenwirbel, Musiknoten, Seifenblasen) · Ohren & Hörner (8 Arten) · Schweif mit Physik (u. a. Kitsune, Sternenschweif) · Begleiter (12 Arten, u. a. Orb, Qualle, Himmelswal, Papierkranich, Axolotl, Fee, Koi-Blase) · Schwebende Klingen (Schwert, Axt, Dreizack) |
 | **HUD** | Target-HUD · Keystrokes + CPS · Info (FPS, Ping, XYZ, Richtung, Tempo, Uhr, Server) · Rüstungs-HUD · Effekt-HUD · Item-Zähler · Cooldowns · Totem-Warnung · Reach · Session-Stats · Kompass · Angriffs-Anzeige · Low-HP-Warnung |
@@ -35,6 +35,15 @@ Im Menü oben rechts auf **„♛ Garderobe“**:
 - **Begleiter:** eine leuchtende Qualle, ein kleiner Himmelswal, der hoch über dir seine Kreise zieht, ein Papierkranich oder ein Axolotl.
 - **Lo-Fi:** Kopfhörer, aus denen Musiknoten aufsteigen, oder eine Aura aus Musiknoten bzw. Seifenblasen.
 
+## Himmel
+
+Die Karte **Himmel** (ist erst aus) bringt Ruhe über deinen Kopf. Jedes Teil lässt sich einzeln schalten:
+- **Polarlicht:** Nachts hängen leuchtende Vorhänge im Norden am Himmel, wiegen sich langsam und schimmern. Farben: Grün & Violett, Türkis & Blau, Rosa & Lila.
+- **Sternbilder:** Großer Wagen, Kassiopeia, Orion und Schwan funkeln nachts. Nacheinander wird eines mit feinen Linien nachgezeichnet, bleibt eine Weile und verblasst wieder.
+- **Vogelschwärme:** Tagsüber zieht ab und zu ein kleiner Schwarm in lockerer V-Formation hoch über dich hinweg, mal flatternd, mal gleitend. Als Silhouetten oder als weiße Möwen.
+
+Polarlicht und Sternbilder zeigen sich nur nachts und ohne Regen. Mit „Auch tagsüber“ siehst du sie jederzeit, z. B. zum Ausprobieren.
+
 ## Natur und Ruhe
 
 Auf der Karte **Umgebung** schaltest du jedes Teil einzeln an:
@@ -44,6 +53,7 @@ Auf der Karte **Umgebung** schaltest du jedes Teil einzeln an:
 - **Lichter & Lagerfeuer:** Funken und Hitzeflimmern über Lagerfeuern, weicher Lichtschein um Kerzen und Laternen.
 - **Jukebox-Noten:** Bunte Noten und ein pulsierender Ring, solange eine Jukebox spielt.
 - **Fallende Blätter:** Blätter schweben von Bäumen herab, Kirschbäume rosa, auf Wunsch in Herbstfarben.
+- **Sonnenstrahlen:** Unter Bäumen fallen tagsüber weiche Lichtstrahlen durch die Blätter, in denen kleine Staubkörnchen schweben.
 - **Wassertropfen:** Tropfen auf dem Bildschirm nach dem Auftauchen oder wenn du im Regen nach oben schaust.
 
 **Angel-Moment:** Beim Biss spritzt das Wasser in Ringen und ein „!“ springt über den Schwimmer. Dein Fang erscheint als kleine Karte, Schätze glänzen golden.
@@ -51,6 +61,14 @@ Auf der Karte **Umgebung** schaltest du jedes Teil einzeln an:
 **Sanfte Oberfläche:** Die Hotbar-Auswahl gleitet, das gewählte Item hüpft kurz. Im Inventar wackelt das Item unter der Maus leicht, und bei Shift-Klick fliegt es sichtbar an seinen Platz.
 
 **Zen-Modus** (ist erst aus): Stehst du eine Weile still (Standard 45 s), verschwindet das HUD und die Kamera kreist langsam um dich. Jede Taste, jeder Klick und jede Mausbewegung holt alles zurück.
+
+## Bildeffekte
+
+Die Karte **Bildeffekte** (ist erst aus) legt einen kleinen Shader über die Welt. Das HUD bleibt scharf.
+- **Sättigung:** von 0 % (Schwarzweiß) bis 200 % (doppelt so bunt) in 25-%-Schritten. Standard sind 125 %.
+- **Motion Blur:** Aus, Leicht, Mittel oder Stark. Schnelle Kamerabewegungen verwischen weich.
+
+Wenn du einem Creeper oder einer Spinne zuschaust (Zuschauermodus), zeigt das Spiel seinen eigenen Effekt. Danach kommen die Bildeffekte von selbst zurück.
 
 ## Farbwähler
 
@@ -64,6 +82,8 @@ Bei jeder Farbe gibt es hinter der Palette ein **„+“**. Das öffnet den Farb
 **Linke Alt-Taste halten** (änderbar unter Steuerung) und du schaust dich in der dritten Person um, während du weiter geradeaus läufst. Mausrad ändert den Abstand. Loslassen schwenkt die Kamera weich zurück.
 - Einstellbar: Halten oder Umschalten, Abstand, Maus invertieren, weiches Zurückschwenken.
 - **Server-Sperrliste:** Manche Server verbieten Freelook. Dort bleibt es aus. **Hypixel ist schon eingetragen.** Auf der Karte siehst du, ob der aktuelle Server gesperrt ist, und kannst ihn mit einem Klick sperren oder erlauben.
+
+Die gleiche Sperrliste haben auch **Fullbright** und **Flugbahn** (dort ist sie anfangs leer).
 
 ## HUD bearbeiten
 
@@ -94,7 +114,9 @@ Im Menü oben rechts auf **„✛ HUD bearbeiten“**:
 
 Am einfachsten: **`bauen-und-installieren.bat`** doppelklicken. Das baut die Mod und ersetzt die alte Juiced-Version im Modrinth-Profil „Fabric 26.3“.
 
-Von Hand: `gradlew.bat build` (Windows) oder `./gradlew build`. Die Mod liegt dann in `build/libs/juiced-2.5.2.jar`. Zusammen mit Fabric API in den `mods`-Ordner legen, und dort nur eine Juiced-Jar behalten.
+Von Hand: `gradlew.bat build` (Windows) oder `./gradlew build`. Die Mod liegt dann in `build/libs/juiced-2.6.0.jar`. Zusammen mit Fabric API in den `mods`-Ordner legen, und dort nur eine Juiced-Jar behalten.
+
+Auf GitHub baut **GitHub Actions** die Mod bei jedem Push. Die fertige Jar liegt beim jeweiligen Lauf unter „Artifacts“.
 
 ## Performance
 
@@ -108,7 +130,7 @@ Von Hand: `gradlew.bat build` (Windows) oder `./gradlew build`. Die Mod liegt da
 
 | Ordner | Inhalt |
 |---|---|
-| `core/` | Modul-System, Einstellungen, Config (`config/juiced.json`), Theme, Farben |
+| `core/` | Modul-System, Einstellungen, Config (`config/juiced.json`; ist sie kaputt, bleibt sie als `juiced.json.broken` erhalten), Theme, Farben |
 | `combat/CombatEvents` | Erkennt Treffer, Crits, Kills, Totem-Pops, Sprünge und dein aktuelles Ziel |
 | `render/Geo` | Gebündelte 3D-Geometrie: leuchtende Ringe, Bänder, Glow-Punkte, Sterne |
 | `render/Sparks` | Eigenes, sehr leichtes Partikelsystem |
@@ -116,7 +138,11 @@ Von Hand: `gradlew.bat build` (Windows) oder `./gradlew build`. Die Mod liegt da
 | `modules/` | Alle Module, nach Kategorie sortiert |
 | `render/FreeCamera` | Freie Kamera für Freelook und die Garderobe (dreht nur die Kamera, nie den Spieler) |
 | `render/NearbyBlocks` | Sucht alle zwei Sekunden Lagerfeuer, Kerzen, Laternen, Jukeboxen und Blätter in der Nähe |
-| `core/ModuleGroup` | Mehrere Module auf einer Karte (Kopf, Rücken, Atmosphäre, Umgebung, Klare Sicht, Sanfte Oberfläche, Treffer, Trails) |
+| `core/ModuleGroup` | Mehrere Module auf einer Karte (Kopf, Rücken, Atmosphäre, Himmel, Umgebung, Klare Sicht, Sanfte Oberfläche, Treffer, Trails) |
+| `core/ServerBlockList` | Server-Sperrliste für Module, die manche Server verbieten (Freelook, Fullbright, Flugbahn) |
+| `render/Sky` | Wie sehr gerade Tag oder Nacht ist, aus den Himmelswerten des Spiels |
+| `render/PostEffect` | Legt einen Shader aus `assets/juiced/post_effect` über das Bild (Bildeffekte) |
+| `MixinCheck` | Schreibt beim Start ins Log, wenn ein Mixin in dieser Minecraft-Version nichts mehr findet |
 | `gui/DeckScreen` | Das Menü |
 | `gui/WardrobeScreen` | Die Garderobe mit Outfits |
 | `gui/ColorPickerScreen` | Der Farbwähler |
