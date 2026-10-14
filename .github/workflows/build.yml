@@ -23,6 +23,27 @@ jobs:
           chmod +x gradlew
           ./gradlew build --stacktrace
 
+      # Temporary: checks the names Juiced looks up by reflection against the real Minecraft jar
+      - name: Check reflection targets
+        continue-on-error: true
+        run: |
+          JAR=""
+          for j in $(find ~/.gradle/caches .gradle -name '*.jar' 2>/dev/null); do
+            if unzip -l "$j" 2>/dev/null | grep -q 'net/minecraft/client/renderer/GameRenderer.class'; then JAR="$j"; break; fi
+          done
+          echo "MC jar: $JAR"
+          echo "== GameRenderer"
+          javap -p -cp "$JAR" net.minecraft.client.renderer.GameRenderer | grep -iE "posteffect|Identifier|effectActive"
+          echo "== EnvironmentAttributes"
+          javap -p -cp "$JAR" net.minecraft.world.attribute.EnvironmentAttributes | grep -E "STAR_BRIGHTNESS|SKY_LIGHT_FACTOR"
+          echo "== PostChainConfig"
+          unzip -l "$JAR" | grep -i "PostChainConfig"
+          javap -p -cp "$JAR" 'net.minecraft.client.renderer.PostChainConfig$InternalTarget' || true
+          echo "== PostChain persistent"
+          javap -p -cp "$JAR" net.minecraft.client.renderer.PostChain | grep -iE "persistent|InternalTarget" || true
+          echo "== Lightmap texture fields"
+          javap -p -cp "$JAR" net.minecraft.client.renderer.Lightmap | grep -i "GpuTexture" || true
+
       - uses: actions/upload-artifact@v4
         with:
           name: juiced
