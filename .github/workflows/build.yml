@@ -23,48 +23,6 @@ jobs:
           chmod +x gradlew
           ./gradlew build --stacktrace
 
-      # Temporary: checks the names Juiced looks up by reflection against the real Minecraft jars
-      - name: Check reflection targets
-        continue-on-error: true
-        run: |
-          LOOM=~/.gradle/caches/fabric-loom/26.3
-          ls -la $LOOM || true
-          CP=$(find $LOOM -maxdepth 1 -name 'minecraft-*.jar' | tr '\n' ':')
-          echo "Classpath: $CP"
-          echo "== EnvironmentAttributes"
-          javap -p -cp "$CP" net.minecraft.world.attribute.EnvironmentAttributes | grep -E "STAR_BRIGHTNESS|SKY_LIGHT_FACTOR|SUN_ANGLE" || true
-          echo "== PostChainConfig.InternalTarget"
-          javap -p -cp "$CP" 'net.minecraft.client.renderer.PostChainConfig$InternalTarget' || true
-          echo "== PostChain"
-          javap -p -cp "$CP" net.minecraft.client.renderer.PostChain | grep -iE "persistent|InternalTarget" || true
-          echo "== GameRenderer bytecode around post effects"
-          javap -c -p -cp "$CP" net.minecraft.client.renderer.GameRenderer > gr.txt || true
-          python3 - <<'EOF'
-          import re
-          text = open('gr.txt').read().split('\n')
-          methods, cur = [], []
-          for line in text:
-              if re.match(r'^  \S.*\);$', line) or re.match(r'^  \S.*\) throws .*;$', line):
-                  if cur: methods.append(cur)
-                  cur = [line]
-              elif cur:
-                  cur.append(line)
-          if cur: methods.append(cur)
-          keys = ('spectatedEntity', 'requestedPostEffects', 'applyPostEffects', 'preparePostEffects', 'END_OF_FRAME_POST_EFFECT')
-          for m in methods:
-              body = '\n'.join(m)
-              if any(k in body for k in keys):
-                  if len(m) <= 160:
-                      print(body)
-                  else:
-                      print(m[0] + '   [long method, matching lines only]')
-                      for i, l in enumerate(m):
-                          if any(k in l for k in keys):
-                              print('\n'.join(m[max(1, i - 12):i + 4]))
-                              print('   ...')
-                  print('----')
-          EOF
-
       - uses: actions/upload-artifact@v4
         with:
           name: juiced
