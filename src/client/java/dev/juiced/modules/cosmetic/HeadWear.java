@@ -16,7 +16,6 @@ import dev.juiced.render.Shapes;
 
 /** Things for your head: a flower crown, a top hat, a wizard hat, a floating crystal or a little rain cloud. */
 public final class HeadWear extends CosmeticModule {
-	private static final float TOP = 0.47f;
 	private static final int[] FLOWERS = {0xF7A8C8, 0xFFFFFF, 0xC9B3F2, 0xFFD27A, 0xFFB4A2};
 
 	public static final String[] KINDS = {"Blumenkranz", "Zylinder", "Zauberhut", "Kristall", "Regenwolke", "Strohhut", "Kopfhörer", "Mondsichel"};
@@ -60,8 +59,9 @@ public final class HeadWear extends CosmeticModule {
 		for (int k = 0; k < flowers; k++) {
 			double a = k * Math.PI * 2 / flowers;
 			float yaw = (float) Math.toDegrees(a);
-			// Flowers sit around the top of the head, facing outwards
-			Pose3 flower = head.copy().move(Math.sin(a) * 0.27 * s, TOP - 0.06, Math.cos(a) * 0.27 * s).yaw(yaw).pitch(-20);
+			// Flowers sit around the top of the head, facing outwards, close to its sides at any size
+			double r = (0.235 + 0.035 * s) * squareRadius(a);
+			Pose3 flower = head.copy().move(Math.sin(a) * r, HEAD_TOP - 0.06, Math.cos(a) * r).yaw(yaw).pitch(-20);
 			int petal = ownColor.on() ? Colors.mixRgb(color.rgb(k / (float) flowers), 0xFFFFFF, (k % 3) * 0.2f) : FLOWERS[k % FLOWERS.length];
 
 			for (int p = 0; p < 5; p++) {
@@ -72,17 +72,26 @@ public final class HeadWear extends CosmeticModule {
 			geo.box(flower.copy().move(0, 0, 0.018 * s), 0.014f * s, 0.014f * s, 0.008f * s, 0xFFC94A, 1f);
 			// Leaf between this flower and the next
 			double leafAngle = a + Math.PI / flowers;
-			Pose3 leaf = head.copy().move(Math.sin(leafAngle) * 0.265 * s, TOP - 0.075, Math.cos(leafAngle) * 0.265 * s).yaw((float) Math.toDegrees(leafAngle)).roll(35);
+			double leafR = (0.23 + 0.035 * s) * squareRadius(leafAngle);
+			Pose3 leaf = head.copy().move(Math.sin(leafAngle) * leafR, HEAD_TOP - 0.075, Math.cos(leafAngle) * leafR).yaw((float) Math.toDegrees(leafAngle)).roll(35);
 			geo.box(leaf, 0.035f * s, 0.012f * s, 0.006f * s, 0x5FA85A, 1f);
 		}
 
 		geo.endModel();
 	}
 
+	/**
+	 * Distance to a rounded square of size 1 in direction {@code a}, relative to a circle. Things placed
+	 * around the head with it go around its corners instead of through them.
+	 */
+	private static double squareRadius(double a) {
+		return 1 / Math.pow(Math.pow(Math.abs(Math.sin(a)), 8) + Math.pow(Math.abs(Math.cos(a)), 8), 1 / 8.0);
+	}
+
 	private void topHat(Geo geo, float s) {
 		int body = main(0x24242C);
 		int band = accent.rgb();
-		Pose3 hat = headPose().move(0, TOP + 0.012, 0);
+		Pose3 hat = headPose().move(0, HEAD_TOP + 0.012, 0);
 		geo.beginModel();
 		geo.box(hat, 0.36f * s, 0.012f * s, 0.36f * s, body, 1f);
 		geo.box(hat.copy().move(0, 0.03 * s, 0), 0.215f * s, 0.022f * s, 0.215f * s, band, 1f);
@@ -94,7 +103,7 @@ public final class HeadWear extends CosmeticModule {
 	private void wizardHat(Geo geo, float s, float time) {
 		int body = main(0x5B3FA8);
 		int trim = accent.rgb();
-		Pose3 hat = headPose().move(0, TOP + 0.01, 0);
+		Pose3 hat = headPose().move(0, HEAD_TOP + 0.01, 0);
 		geo.beginModel();
 		geo.box(hat, 0.4f * s, 0.01f * s, 0.4f * s, body, 1f);
 		geo.box(hat.copy().move(0, 0.03 * s, 0), 0.25f * s, 0.022f * s, 0.25f * s, trim, 1f);
@@ -124,16 +133,18 @@ public final class HeadWear extends CosmeticModule {
 
 	private void crystal(Geo geo, float s, float time) {
 		int rgb = main(0x6CF26A);
-		double y = py + height + 0.38 + Math.sin(time * 1.8) * 0.05;
-		geo.glowDot(px, y, pz, 0.32f * s, rgb, 0.3f);
-		Shapes.gem(geo, px, y, pz, 0.085f * s, 0.16f * s, time * 1.2f, rgb, 0.85f);
+		Pose3 above = aboveHead();
+		double y = above.y + 0.28 + Math.sin(time * 1.8) * 0.05;
+		geo.glowDot(above.x, y, above.z, 0.32f * s, rgb, 0.3f);
+		Shapes.gem(geo, above.x, y, above.z, 0.085f * s, 0.16f * s, time * 1.2f, rgb, 0.85f);
 	}
 
 	private void cloud(Geo geo, float s, float time) {
 		int rgb = main(0xEEF1F6);
-		double baseY = py + height + 0.5;
-		float[] bodyYawVec = forward(bodyYaw);
-		Pose3 cloud = Pose3.at(px, baseY + Math.sin(time * 1.2) * 0.03, pz, bodyYaw);
+		// Floats level over the head and follows it, so the rain keeps falling on your head
+		Pose3 above = aboveHead();
+		double baseY = above.y + 0.4;
+		Pose3 cloud = Pose3.at(above.x, baseY + Math.sin(time * 1.2) * 0.03, above.z, headYaw);
 		geo.beginModel();
 		geo.box(cloud, 0.24f * s, 0.07f * s, 0.15f * s, rgb, 0.95f);
 		geo.box(cloud.copy().move(-0.1 * s, 0.07 * s, 0), 0.1f * s, 0.07f * s, 0.11f * s, rgb, 0.95f);
@@ -144,7 +155,7 @@ public final class HeadWear extends CosmeticModule {
 
 		// Gentle rain that stops at your head
 		int drop = Colors.argb(0.75f, accent.get() == Colors.GOLD ? 0x8FC8FF : accent.rgb());
-		double headTop = py + height + 0.02;
+		double headTop = above.y - 0.03;
 
 		for (int k = 0; k < 9; k++) {
 			float fall = (time * 1.4f + k * 0.37f) % 1f;
@@ -152,8 +163,8 @@ public final class HeadWear extends CosmeticModule {
 			double dz = ((k * 53) % 5 - 2) * 0.05 * s;
 			double top = baseY - 0.06 * s;
 			double yDrop = top - fall * (top - headTop);
-			double x = px + dx * -bodyYawVec[1] + dz * bodyYawVec[0];
-			double z = pz + dx * bodyYawVec[0] + dz * bodyYawVec[1];
+			double x = above.x + cloud.rx * dx + cloud.fx * dz;
+			double z = above.z + cloud.rz * dx + cloud.fz * dz;
 			geo.line(x, yDrop, z, x, yDrop - 0.06, z, 0.006f, drop, Colors.fade(drop, 0.3f));
 		}
 	}
@@ -162,7 +173,7 @@ public final class HeadWear extends CosmeticModule {
 	private void strawHat(Geo geo, float s, float time) {
 		int straw = main(0xE8C77A);
 		int ribbon = accent.get() == Colors.GOLD ? 0xC8423A : accent.rgb();
-		Pose3 head = headPose().move(0, TOP + 0.01, 0);
+		Pose3 head = headPose().move(0, HEAD_TOP + 0.01, 0);
 		// Brim: a flat round disc. Turned so the polygon lies flat
 		int points = 16;
 		float[] xs = new float[points];
@@ -191,17 +202,36 @@ public final class HeadWear extends CosmeticModule {
 		int body = main(0x2A2A30);
 		int glow = accent.rgb(time * 0.1f);
 		Pose3 head = headPose().move(0, 0.24, 0);
+		// Cups rest on the sides of the head at any size; the band clears the outer skin layer
+		float cupX = 0.235f + 0.035f * s;
+		float wide = Math.max(cupX, HEAD_OUTER + 0.02f * s);
+		float tall = HEAD_OUTER - 0.005f + 0.02f * s;
 		geo.beginModel();
 
-		// Band over the top of the head, from ear to ear
-		for (int i = 0; i <= 8; i++) {
-			double a = Math.PI * i / 8;
-			Pose3 band = head.copy().move(Math.cos(a) * 0.275 * s, Math.sin(a) * 0.28 * s, -0.01 * s).roll((float) Math.toDegrees(a));
-			geo.box(band, 0.016f * s, 0.035f * s, 0.03f * s, i == 4 ? Colors.shade(body, 0.15f) : body, 1f);
+		// Band over the top of the head, from ear to ear. It follows a rounded square, so it hugs
+		// the blocky head instead of cutting through its top corners.
+		int pieces = 16;
+		float x0 = wide;
+		float y0 = 0f;
+
+		for (int i = 1; i <= pieces; i++) {
+			double a = Math.PI * i / pieces;
+			float c = (float) Math.cos(a);
+			float sn = (float) Math.sin(a);
+			float x1 = wide * Math.signum(c) * (float) Math.pow(Math.abs(c), 1 / 6.0);
+			float y1 = tall * (float) Math.pow(sn, 1 / 6.0);
+			float dx = x1 - x0;
+			float dy = y1 - y0;
+			float half = (float) Math.sqrt(dx * dx + dy * dy) / 2f + 0.004f;
+			Pose3 band = head.copy().move((x0 + x1) / 2f, (y0 + y1) / 2f, -0.01 * s).roll((float) Math.toDegrees(Math.atan2(dx, dy)));
+			boolean top = i == pieces / 2 || i == pieces / 2 + 1;
+			geo.box(band, 0.016f * s, half, 0.03f * s, top ? Colors.shade(body, 0.15f) : body, 1f);
+			x0 = x1;
+			y0 = y1;
 		}
 
 		for (int side = -1; side <= 1; side += 2) {
-			Pose3 cup = head.copy().move(side * 0.27 * s, -0.01 * s, -0.01 * s);
+			Pose3 cup = head.copy().move(side * cupX, -0.01 * s, -0.01 * s);
 			geo.box(cup, 0.035f * s, 0.085f * s, 0.075f * s, body, 1f);
 			geo.box(cup.copy().move(-side * 0.035 * s, 0, 0), 0.012f * s, 0.075f * s, 0.065f * s, 0x4A4A55, 1f);
 			geo.box(cup.copy().move(side * 0.037 * s, 0, 0), 0.004f * s, 0.05f * s, 0.045f * s, glow, 1f);
@@ -241,12 +271,13 @@ public final class HeadWear extends CosmeticModule {
 	/** A pale crescent moon floating above your head with a few tiny stars. */
 	private void moon(Geo geo, float s, float time) {
 		int rgb = main(0xFFF2B0);
-		double y = py + height + 0.42 + Math.sin(time * 1.3) * 0.04;
-		geo.glowDot(px, y, pz, 0.35f * s, rgb, 0.22f);
-		float[] basis = geo.billboardBasis(px, y, pz);
-		float cx = geo.rx(px);
+		Pose3 above = aboveHead();
+		double y = above.y + 0.32 + Math.sin(time * 1.3) * 0.04;
+		geo.glowDot(above.x, y, above.z, 0.35f * s, rgb, 0.22f);
+		float[] basis = geo.billboardBasis(above.x, y, above.z);
+		float cx = geo.rx(above.x);
 		float cy = geo.ry(y);
-		float cz = geo.rz(pz);
+		float cz = geo.rz(above.z);
 		float radius = 0.13f * s;
 		float thickness = 0.075f * s;
 		float tilt = (float) Math.toRadians(25 + Math.sin(time * 0.7) * 6);
@@ -284,7 +315,7 @@ public final class HeadWear extends CosmeticModule {
 		for (int k = 0; k < 3; k++) {
 			double a = time * 0.4 + k * 2.1;
 			float twinkle = 0.3f + 0.7f * Math.max(0f, (float) Math.sin(time * 2.5f + k * 1.9f));
-			geo.star(px + Math.cos(a) * 0.3 * s, y + Math.sin(a * 1.3) * 0.08, pz + Math.sin(a) * 0.3 * s, 0.035f * s, time + k, 0xFFFFFF, twinkle);
+			geo.star(above.x + Math.cos(a) * 0.3 * s, y + Math.sin(a * 1.3) * 0.08, above.z + Math.sin(a) * 0.3 * s, 0.035f * s, time + k, 0xFFFFFF, twinkle);
 		}
 	}
 

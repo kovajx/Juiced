@@ -11,6 +11,7 @@ import dev.juiced.core.setting.ColorSetting;
 import dev.juiced.core.setting.SliderSetting;
 import dev.juiced.render.Geo;
 import dev.juiced.render.Gui2D;
+import dev.juiced.render.Pose3;
 
 public final class ConeHat extends CosmeticModule {
 	private final ColorSetting color = add(new ColorSetting("color", "Farbe"));
@@ -19,7 +20,7 @@ public final class ConeHat extends CosmeticModule {
 	private final BoolSetting rim = add(new BoolSetting("rim", "Leuchtender Rand", true));
 
 	public ConeHat() {
-		super("cone_hat", "China-Hut", "Ein flacher, durchsichtiger China-Hut über deinem Kopf, mit leuchtendem Rand, der sich langsam dreht.");
+		super("cone_hat", "China-Hut", "Ein flacher, durchsichtiger China-Hut auf deinem Kopf, mit leuchtendem Rand, der sich langsam dreht. Er neigt sich mit deinem Kopf.");
 	}
 
 	@Override
@@ -27,27 +28,46 @@ public final class ConeHat extends CosmeticModule {
 		float s = size.f();
 		float radius = 0.6f * s;
 		float peak = 0.26f * s;
-		double y0 = py + height - 0.04;
+		// Sits on the head and tilts with it. The slope just clears the corners of the outer skin layer;
+		// a hat smaller than the head rests on top of it instead.
+		float corner = HEAD_OUTER * 1.4142f;
+		float lift = HEAD_TOP / 2 + HEAD_OUTER + 0.006f - peak * Math.max(0f, 1f - corner / radius);
+		Pose3 hat = headPose().move(0, lift, 0);
 		int segments = Theme.detail(32);
 		float time = Clock.tf();
-		float cx = geo.rx(px);
-		float cy = geo.ry(y0);
-		float cz = geo.rz(pz);
+		float cx = geo.rx(hat.x);
+		float cy = geo.ry(hat.y);
+		float cz = geo.rz(hat.z);
+		float tipX = cx + hat.ux * peak;
+		float tipY = cy + hat.uy * peak;
+		float tipZ = cz + hat.uz * peak;
 		float alpha = opacity.f();
 		int apex = Colors.argb(Math.min(1f, alpha + 0.2f), Colors.shade(color.rgb(time * 0.1f), 0.5f));
 		float step = (float) (Math.PI * 2 / segments);
+		float spin = time * 0.3f;
+		// Rim points lie in the hat's own right/forward plane
+		float c = (float) Math.cos(spin) * radius;
+		float sn = (float) Math.sin(spin) * radius;
+		float x0 = cx + hat.rx * c + hat.fx * sn;
+		float y0 = cy + hat.ry * c + hat.fy * sn;
+		float z0 = cz + hat.rz * c + hat.fz * sn;
 
 		for (int i = 0; i < segments; i++) {
-			float a0 = i * step + time * 0.3f;
-			float a1 = a0 + step;
+			float a1 = (i + 1) * step + spin;
+			c = (float) Math.cos(a1) * radius;
+			sn = (float) Math.sin(a1) * radius;
+			float x1 = cx + hat.rx * c + hat.fx * sn;
+			float y1 = cy + hat.ry * c + hat.fy * sn;
+			float z1 = cz + hat.rz * c + hat.fz * sn;
 			int edge = Colors.argb(alpha * 0.85f, color.rgb(i / (float) segments + time * 0.1f));
-			geo.tri(cx, cy + peak, cz, apex,
-					cx + (float) Math.cos(a0) * radius, cy, cz + (float) Math.sin(a0) * radius, edge,
-					cx + (float) Math.cos(a1) * radius, cy, cz + (float) Math.sin(a1) * radius, edge);
+			geo.tri(tipX, tipY, tipZ, apex, x0, y0, z0, edge, x1, y1, z1, edge);
+			x0 = x1;
+			y0 = y1;
+			z0 = z1;
 		}
 
 		if (rim.on()) {
-			geo.groundRing(px, y0, pz, radius, 0.025f * s, 0.08f * s, segments, time * 0.3f, (float) (Math.PI * 2), t -> color.rgb(t + time * 0.1f), 0.95f);
+			geo.glowRing(cx, cy, cz, hat.rx, hat.ry, hat.rz, hat.fx, hat.fy, hat.fz, radius, 0.025f * s, 0.08f * s, segments, spin, (float) (Math.PI * 2), t -> color.rgb(t + time * 0.1f), 0.95f);
 		}
 	}
 
