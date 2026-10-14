@@ -55,12 +55,15 @@ import dev.juiced.modules.tweaks.SmoothHotbar;
 import dev.juiced.modules.tweaks.ZenMode;
 import dev.juiced.modules.tweaks.Zoom;
 import dev.juiced.modules.visual.AmbientParticles;
+import dev.juiced.modules.visual.Aurora;
+import dev.juiced.modules.visual.BirdFlocks;
 import dev.juiced.modules.visual.BlockOutline;
 import dev.juiced.modules.visual.CustomCrosshair;
 import dev.juiced.modules.visual.DamageNumbers;
 import dev.juiced.modules.visual.Footprints;
 import dev.juiced.modules.visual.JumpCircles;
 import dev.juiced.modules.visual.BreathClouds;
+import dev.juiced.modules.visual.Constellations;
 import dev.juiced.modules.visual.CozyLights;
 import dev.juiced.modules.visual.FallingLeaves;
 import dev.juiced.modules.visual.FishingMoment;
@@ -72,6 +75,7 @@ import dev.juiced.modules.visual.ZenGarden;
 import dev.juiced.modules.visual.Petals;
 import dev.juiced.modules.visual.ProjectileTrails;
 import dev.juiced.modules.visual.ScreenEffects;
+import dev.juiced.modules.visual.SunRays;
 import dev.juiced.modules.visual.Trails;
 import dev.juiced.render.Geo;
 
@@ -116,15 +120,22 @@ public final class ModuleManager {
 				.styles("petals.", Petals::new, "style", "Kirschblüten", 0, "Herbstlaub", 1, "Lavendel", 2, "Rosen", 3, "Schnee", 4)
 				.build());
 		register(new KoiPond());
+		register(ModuleGroup.bundle("sky", "Himmel", Category.VISUALS, false,
+				"Ruhe am Himmel: nachts Polarlichter und Sternbilder, die langsam nachgezeichnet werden, tagsüber ziehen Vogelschwärme vorbei.")
+				.bundled("aurora.", Aurora::new, "Polarlicht", "aurora")
+				.bundled("stars.", Constellations::new, "Sternbilder", "constellations")
+				.bundled("birds.", BirdFlocks::new, "Vogelschwärme", "birds")
+				.build());
 		register(ModuleGroup.bundle("environment", "Umgebung", Category.VISUALS, true,
 				"Ruhige Natur um dich herum: geharkte Linien im Sand, Regenringe und Pfützen, Atemwolken in der Kälte, Funken über Lagerfeuern, "
-						+ "leuchtende Kerzen und Laternen, Noten aus Jukeboxen, fallende Blätter und Wassertropfen auf dem Bildschirm.")
+						+ "leuchtende Kerzen und Laternen, Noten aus Jukeboxen, fallende Blätter, Sonnenstrahlen durch die Bäume und Wassertropfen auf dem Bildschirm.")
 				.bundled("zen.", ZenGarden::new, "Zen-Garten", "zen_garden")
 				.bundled("rain.", RainRipples::new, "Regen & Pfützen", "rain")
 				.bundled("breath.", BreathClouds::new, "Atemwolken", "breath")
 				.bundled("lights.", CozyLights::new, "Lichter & Lagerfeuer", "lights")
 				.bundled("jukebox.", JukeboxNotes::new, "Jukebox-Noten", "jukebox")
 				.bundled("leaves.", FallingLeaves::new, "Fallende Blätter", "leaves")
+				.bundled("sun_rays.", SunRays::new, "Sonnenstrahlen", "sun_rays")
 				.bundled("drops.", ScreenDrops::new, "Wassertropfen", "drops")
 				.build());
 		register(new FishingMoment());
