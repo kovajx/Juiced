@@ -217,15 +217,14 @@ public final class ModuleGroup extends Module {
 
 	@Override
 	protected void onDisable() {
-		if (!isEnabled()) {
-			sync();
-			return;
-		}
+		sync();
+	}
 
-		// Still on: this is "clear running effects" (leaving the world)
+	@Override
+	public void clearEffects() {
 		for (Module part : parts) {
 			if (part.isEnabled()) {
-				part.onDisable();
+				part.clearEffects();
 			}
 		}
 	}

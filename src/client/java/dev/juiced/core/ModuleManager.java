@@ -307,7 +307,7 @@ public final class ModuleManager {
 	public static void clearEffects() {
 		for (Module module : MODULES) {
 			if (module.isEnabled()) {
-				module.onDisable();
+				module.clearEffects();
 			}
 		}
 	}

@@ -78,6 +78,11 @@ public abstract class Module {
 	protected void onDisable() {
 	}
 
+	/** Leaving a world: drop running effects while the module stays on. By default the same as {@link #onDisable()}. */
+	public void clearEffects() {
+		onDisable();
+	}
+
 	/** Every client tick (20 per second). */
 	public void tick(Minecraft minecraft) {
 	}
