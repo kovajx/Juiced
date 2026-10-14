@@ -150,14 +150,22 @@ public final class Wings extends CosmeticModule {
 	}
 
 	@Override
+	protected void onDisable() {
+		settled = false;
+	}
+
+	@Override
 	protected void draw(Geo target) {
-		// Lying poses (elytra, swimming, sleeping) would leave upright wings floating in the air
-		if (player.isFallFlying() || player.isVisuallySwimming() || player.isSleeping()) {
+		// Lying poses (elytra, swimming, riptide spin, sleeping, falling over on death) would leave
+		// upright wings floating in the air
+		if (player.isFallFlying() || player.isVisuallySwimming() || player.isAutoSpinAttack() || player.isSleeping() || player.isDeadOrDying()) {
 			return;
 		}
 
 		boolean crouch = player.isCrouching();
-		float airTarget = player.onGround() ? 0f : 1f;
+		// Sitting in a boat or on a horse, climbing a ladder or floating in water is not flying
+		boolean flying = !player.onGround() && !player.isPassenger() && !player.onClimbable() && !player.isInWater();
+		float airTarget = flying ? 1f : 0f;
 		float tuckTarget = crouch ? 1f : 0f;
 
 		if (!settled) {
@@ -419,7 +427,8 @@ public final class Wings extends CosmeticModule {
 	}
 
 	private int count(int high) {
-		return preview ? Math.max(3, high / 2) : Theme.detail(high);
+		// Theme.detail keeps at least six at medium quality, which would add detail to small counts
+		return preview ? Math.max(3, high / 2) : Math.min(high, Theme.detail(high));
 	}
 
 	// ---- Engel ----------------------------------------------------------------------------
@@ -928,7 +937,8 @@ public final class Wings extends CosmeticModule {
 				float dx = (ax[0] + ax[1] + ax[2] + ax[3]) / 4f + wn[0] * facing;
 				float dy = (ay[0] + ay[1] + ay[2] + ay[3]) / 4f + wn[1] * facing;
 				float dz = (az[0] + az[1] + az[2] + az[3]) / 4f + wn[2] * facing;
-				spot(dx, dy, dz, 0.011f * s, wx, wy, white, white);
+				// Only a few pixels big in game, a diamond reads as round there
+				spot(dx, dy, dz, 0.011f * s, wx, wy, white, white, 4);
 			}
 		}
 
@@ -949,11 +959,11 @@ public final class Wings extends CosmeticModule {
 		int ring = Colors.mixRgb(Colors.shade(rgb, 0.3f), 0xFFC23D, 0.6f);
 		int pupil = Colors.argb(0.95f, 0x101018);
 		float r = eyeR * s;
-		spot(ex, ey, ez, r, wx, wy, band, band);
-		spot(ex + wn[0] * facing * 0.5f, ey + wn[1] * facing * 0.5f, ez + wn[2] * facing * 0.5f, r * 0.72f, wx, wy, Colors.argb(0.95f, ring), Colors.argb(0.95f, Colors.shade(ring, -0.2f)));
-		spot(ex + wn[0] * facing, ey + wn[1] * facing, ez + wn[2] * facing, r * 0.38f, wx, wy, pupil, pupil);
+		spot(ex, ey, ez, r, wx, wy, band, band, 8);
+		spot(ex + wn[0] * facing * 0.5f, ey + wn[1] * facing * 0.5f, ez + wn[2] * facing * 0.5f, r * 0.72f, wx, wy, Colors.argb(0.95f, ring), Colors.argb(0.95f, Colors.shade(ring, -0.2f)), 8);
+		spot(ex + wn[0] * facing, ey + wn[1] * facing, ez + wn[2] * facing, r * 0.38f, wx, wy, pupil, pupil, 6);
 		spot(ex + wn[0] * facing * 1.5f + (wy[0] - wx[0]) * r * 0.18f, ey + wn[1] * facing * 1.5f + (wy[1] - wx[1]) * r * 0.18f, ez + wn[2] * facing * 1.5f + (wy[2] - wx[2]) * r * 0.18f,
-				r * 0.13f, wx, wy, white, white);
+				r * 0.13f, wx, wy, white, white, 4);
 	}
 
 	/** 0 near the root, 1 along the outer margin of a butterfly wing. */
@@ -991,11 +1001,11 @@ public final class Wings extends CosmeticModule {
 		az[slot] = o[2] + (wx[2] * x + wy[2] * y + wn[2] * c) * s;
 	}
 
-	/** Small round spot in the plane (u, v), as an eight-sided fan. */
-	private void spot(float x, float y, float z, float r, float[] u, float[] v, int inner, int outer) {
-		for (int i = 0; i < 8; i++) {
-			double a0 = i * Math.PI / 4;
-			double a1 = (i + 1) * Math.PI / 4;
+	/** Small round spot in the plane (u, v), as a fan with the given number of sides. */
+	private void spot(float x, float y, float z, float r, float[] u, float[] v, int inner, int outer, int sides) {
+		for (int i = 0; i < sides; i++) {
+			double a0 = i * 2 * Math.PI / sides;
+			double a1 = (i + 1) * 2 * Math.PI / sides;
 			float c0 = (float) Math.cos(a0) * r;
 			float s0 = (float) Math.sin(a0) * r;
 			float c1 = (float) Math.cos(a1) * r;
@@ -1014,8 +1024,9 @@ public final class Wings extends CosmeticModule {
 		// Origami paper: full color on the top side, paler on the back
 		int front = Colors.mixRgb(rgb, PAPER_BACK, 0.45f);
 		int back = Colors.mixRgb(rgb, PAPER_BACK, 0.78f);
-		// Odd counts, so both outer rays are long ridges
-		int rays = count(11) | 1;
+		// Odd counts, so both outer rays are long ridges. Paper is cheap, and with fewer than seven
+		// rays the fan turns into a flat sheet.
+		int rays = Math.max(7, count(11)) | 1;
 
 		// Main accordion fan, a shorter fan of folds on top, then the folded leading edge
 		pleats(rays, 0.18f, 3f, 1f, 0f, front, back, s);
