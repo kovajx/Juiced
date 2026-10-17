@@ -11,10 +11,11 @@ import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 
 import net.minecraft.client.gui.Hud;
 
+import dev.juiced.core.MenuState;
 import dev.juiced.modules.tweaks.ClearView;
 import dev.juiced.modules.tweaks.ZenMode;
 
-/** Pumpkin and portal overlays of "Klare Sicht", and hiding the HUD in Zen mode. */
+/** Pumpkin and portal overlays of "Klare Sicht", and hiding the HUD in Zen mode and in the Weltprobe menu. */
 @Mixin(Hud.class)
 public abstract class HudMixin {
 	@Inject(method = "extractPortalOverlay", at = @At("HEAD"), cancellable = true, require = 0)
@@ -33,6 +34,6 @@ public abstract class HudMixin {
 
 	@ModifyExpressionValue(method = "extractRenderState", at = @At(value = "FIELD", target = "Lnet/minecraft/client/gui/Hud;isHidden:Z", opcode = Opcodes.GETFIELD), require = 0)
 	private boolean juiced$zenHidesHud(boolean hidden) {
-		return hidden || ZenMode.hidesHud();
+		return hidden || ZenMode.hidesHud() || MenuState.hidesHud();
 	}
 }

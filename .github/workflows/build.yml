@@ -23,49 +23,6 @@ jobs:
           chmod +x gradlew
           ./gradlew build --stacktrace
 
-      # Temporary: prints Minecraft API signatures used as a reference while writing new features
-      - name: API reference
-        continue-on-error: true
-        run: |
-          LOOM=~/.gradle/caches/fabric-loom/26.3
-          CP=$(find $LOOM -maxdepth 1 -name 'minecraft-*.jar' | tr '\n' ':')
-          for c in \
-            net.minecraft.world.entity.decoration.ArmorStand \
-            net.minecraft.world.entity.EntitySpawnReason \
-            net.minecraft.world.entity.EquipmentSlot \
-            net.minecraft.client.gui.screens.Screen \
-            net.minecraft.client.input.KeyEvent \
-            net.minecraft.client.input.InputWithModifiers \
-            net.minecraft.client.input.MouseButtonEvent \
-            net.minecraft.client.CameraType \
-            net.minecraft.client.Camera \
-            net.minecraft.client.gui.Font \
-            net.minecraft.client.gui.Gui \
-            net.minecraft.client.gui.Hud \
-            net.minecraft.client.renderer.entity.ArmorStandRenderer \
-            net.minecraft.client.renderer.entity.state.ArmorStandRenderState \
-            net.minecraft.client.renderer.FirstPersonHandsAndItemsRenderer ; do
-            echo "=== API $c"
-            javap -p -cp "$CP" "$c" || true
-          done
-          echo "=== GREP EntityType"
-          javap -p -cp "$CP" net.minecraft.world.entity.EntityType | grep -nE "ARMOR_STAND|create\(|spawn\(" || true
-          echo "=== GREP Items"
-          javap -p -cp "$CP" net.minecraft.world.item.Items | grep -nE "HAY_BLOCK|CARVED_PUMPKIN|LEATHER_CHESTPLATE|WHEAT" || true
-          echo "=== GREP ItemStack"
-          javap -p -cp "$CP" net.minecraft.world.item.ItemStack | grep -nE "ItemStack\(" | head -20 || true
-          echo "=== GREP Options"
-          javap -p -cp "$CP" net.minecraft.client.Options | grep -nE "hideGui|CameraType|cameraType|bobView|particles|fov" || true
-          echo "=== GREP SoundEvents"
-          javap -p -cp "$CP" net.minecraft.sounds.SoundEvents | grep -nE "ARMOR_STAND|GRASS_BREAK|HAY" || true
-          echo "=== BYTECODE ArmorStand"
-          javap -c -p -cp "$CP" net.minecraft.world.entity.decoration.ArmorStand | grep -nE "lastHit|handleEntityEvent|getGameTime|Clock|playLocalSound|DATA_CLIENT_FLAGS|setShowArms|setNoBasePlate|setSmall|setMarker|bipush +32|^  (public|protected|private)" | head -200 || true
-          echo "=== BYTECODE ArmorStandRenderer"
-          javap -c -p -cp "$CP" net.minecraft.client.renderer.entity.ArmorStandRenderer | grep -nE "wiggle|lastHit|getGameTime|Clock|ldc|fconst|^  (public|protected|private)" | head -120 || true
-          echo "=== BYTECODE Minecraft.isPaused"
-          javap -c -p -cp "$CP" net.minecraft.client.gui.screens.Screen | grep -nE "isPauseScreen" -A4 | head -20 || true
-          echo "=== API END"
-
       - uses: actions/upload-artifact@v4
         with:
           name: juiced

@@ -24,7 +24,7 @@ import dev.juiced.render.Gui2D;
  * <p>Drawing happens in the caller's local coordinates; {@link #originX}/{@link #originY} say where
  * local (0, 0) is on screen, so click areas end up in the right place.
  */
-final class SettingsList {
+public final class SettingsList {
 	static final int TEXT = 0xFFEDEDF2;
 	static final int DIM = 0xFF8A8A99;
 	static final int TRACK = 0xFF33333F;
@@ -32,46 +32,63 @@ final class SettingsList {
 	static final int DOT_GAP = 3;
 
 	@FunctionalInterface
-	interface Sink {
+	public interface Sink {
 		/** Registers a click area in screen coordinates. */
 		void add(int x1, int y1, int x2, int y2, Runnable action);
 	}
 
 	private final Sink sink;
 	private final Consumer<ColorSetting> openPicker;
-	int originX;
-	int originY;
-	int mouseX;
-	int mouseY;
+	public int originX;
+	public int originY;
+	public int mouseX;
+	public int mouseY;
+	/** Row with the keyboard focus (index among the visible rows), or -1. Drawn with an accent outline. */
+	public int focus = -1;
 
 	private SliderSetting dragging;
 	private int dragX1;
 	private int dragX2;
 
-	SettingsList(Sink sink, Consumer<ColorSetting> openPicker) {
+	public SettingsList(Sink sink, Consumer<ColorSetting> openPicker) {
 		this.sink = sink;
 		this.openPicker = openPicker;
 	}
 
-	boolean isDragging() {
+	public boolean isDragging() {
 		return dragging != null;
 	}
 
-	void drag(double screenX) {
+	public void drag(double screenX) {
 		if (dragging != null && dragX2 > dragX1) {
 			dragging.setFraction((screenX - dragX1) / (double) (dragX2 - dragX1));
 		}
 	}
 
-	void release() {
+	public void release() {
 		dragging = null;
+	}
+
+	/** Moves the keyboard focus by {@code delta} visible rows (Up/Down in the Weltprobe drawer), clamped; -1 to 0 starts it. */
+	public void moveFocus(List<Setting<?>> settings, int delta) {
+		// TODO(gui-support)
+	}
+
+	/** Changes the focused row with Left/Right ({@code direction} -1 or +1): toggles, steps sliders, cycles choices and colours, presses buttons. */
+	public void changeFocused(List<Setting<?>> settings, int direction) {
+		// TODO(gui-support)
+	}
+
+	/** Top and bottom (content y, before scrolling) of the focused row, so the caller can scroll it into view; null if none. */
+	public int[] focusedRowSpan(List<Setting<?>> settings, int width) {
+		return null; // TODO(gui-support)
 	}
 
 	/**
 	 * Draws the settings between {@code top} and {@code bottom}, scrolled by {@code scroll} pixels.
 	 * Returns the full content height.
 	 */
-	int draw(GuiGraphicsExtractor g, List<Setting<?>> settings, int left, int width, int top, int bottom, int scroll, boolean interactive) {
+	public int draw(GuiGraphicsExtractor g, List<Setting<?>> settings, int left, int width, int top, int bottom, int scroll, boolean interactive) {
 		int y = top - scroll;
 		int height = 0;
 

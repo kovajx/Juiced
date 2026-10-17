@@ -6,6 +6,7 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 
 import dev.juiced.core.Clock;
 import dev.juiced.core.Hud;
+import dev.juiced.core.MenuState;
 import dev.juiced.core.ModuleManager;
 import dev.juiced.gui.DeckScreen;
 import dev.juiced.gui.HudEditorScreen;
@@ -21,7 +22,7 @@ public final class JuicedHud {
 		Clock.frame();
 		FrameCounter.frame();
 
-		if (minecraft.player == null || minecraft.gui.screen() instanceof DeckScreen || minecraft.gui.screen() instanceof HudEditorScreen) {
+		if (minecraft.player == null || MenuState.hidesHud() || minecraft.gui.screen() instanceof DeckScreen || minecraft.gui.screen() instanceof HudEditorScreen) {
 			return;
 		}
 

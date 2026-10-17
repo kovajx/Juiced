@@ -27,7 +27,7 @@ public final class Outfits {
 
 		for (Module module : ModuleManager.in(Category.COSMETICS)) {
 			JsonObject entry = new JsonObject();
-			entry.addProperty("enabled", module.isEnabled());
+			entry.addProperty("enabled", module.isSwitchedOn());
 			JsonObject settings = new JsonObject();
 
 			for (Setting<?> setting : module.settings) {

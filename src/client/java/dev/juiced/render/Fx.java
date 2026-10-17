@@ -18,8 +18,13 @@ public final class Fx {
 	private Fx() {
 	}
 
+	/** Multiplies the volume of {@link #sound}. The menu turns it down while it plays effects on its straw dummy. */
+	public static float volumeScale = 1f;
+
 	/** Plays a vanilla sound by id (like "block.note_block.hat") that only you hear. */
 	public static void sound(String id, float volume, float pitch) {
+		volume *= volumeScale;
+
 		if (volume <= 0.001f) {
 			return;
 		}

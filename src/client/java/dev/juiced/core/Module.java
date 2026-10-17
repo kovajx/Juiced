@@ -3,6 +3,8 @@ package dev.juiced.core;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.jspecify.annotations.Nullable;
+
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.world.entity.Entity;
@@ -24,6 +26,8 @@ public abstract class Module {
 	public final List<Setting<?>> settings = new ArrayList<>();
 	private final boolean defaultEnabled;
 	private boolean enabled;
+	/** Running for a moment in the menu (Weltprobe) without being switched on. Never saved. */
+	private boolean probing;
 
 	protected Module(String id, String name, Category category, boolean defaultEnabled, String description) {
 		this.id = id;
@@ -39,7 +43,13 @@ public abstract class Module {
 		return setting;
 	}
 
+	/** True while the module runs: switched on, or tried out in the menu. Everything that draws or reacts asks this. */
 	public boolean isEnabled() {
+		return enabled || alwaysOn() || probing;
+	}
+
+	/** The state the player chose, as saved and shown as AN/AUS. A try-out in the menu doesn't count. */
+	public boolean isSwitchedOn() {
 		return enabled || alwaysOn();
 	}
 
@@ -48,11 +58,36 @@ public abstract class Module {
 			return;
 		}
 
+		boolean wasRunning = isEnabled();
 		this.enabled = enabled;
+		runningChanged(wasRunning);
+	}
 
-		if (enabled) {
+	/** True while the menu tries the module out. */
+	public boolean isProbing() {
+		return probing;
+	}
+
+	/**
+	 * Lets the menu run the module for a moment without switching it on: it draws and reacts like an enabled module,
+	 * but stays off in the config. Turning the probe off clears its effects unless the module is switched on.
+	 */
+	public void setProbe(boolean probe) {
+		if (probing == probe) {
+			return;
+		}
+
+		boolean wasRunning = isEnabled();
+		probing = probe;
+		runningChanged(wasRunning);
+	}
+
+	private void runningChanged(boolean wasRunning) {
+		boolean running = isEnabled();
+
+		if (running && !wasRunning) {
 			onEnable();
-		} else {
+		} else if (!running && wasRunning) {
 			onDisable();
 		}
 	}
@@ -124,6 +159,27 @@ public abstract class Module {
 
 	/** You landed after falling or jumping. */
 	public void onLand(Entity entity, float fallHeight) {
+	}
+
+	/**
+	 * Called every client tick while the menu shows this module live and it is running. Most effects show by
+	 * themselves; modules that need movement, jumps or other triggers fake a little of it here, because the
+	 * player stands still while the menu is open.
+	 */
+	public void probeTick(Minecraft minecraft, int ticks) {
+	}
+
+	/**
+	 * Why the menu can't show this module live right now, as a short German caption (about 26 characters at most),
+	 * or null if it can. The menu then shows {@link #drawPreview} instead.
+	 */
+	public @Nullable String probeLiveReason(Minecraft minecraft) {
+		return null;
+	}
+
+	/** True if the current server doesn't allow this module. */
+	public boolean blockedHere() {
+		return ServerBlockList.blocks(this);
 	}
 
 	/**

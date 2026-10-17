@@ -1,7 +1,9 @@
 package dev.juiced.core;
 
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 import org.jspecify.annotations.Nullable;
 
@@ -17,11 +19,14 @@ import dev.juiced.core.setting.StringListSetting;
  * or allow it) and the whole list (with a button back to the defaults).
  */
 public final class ServerBlockList {
+	private static final Map<Module, ServerBlockList> BY_MODULE = new IdentityHashMap<>();
+
 	private final StringListSetting blocked;
 	private final @Nullable Runnable onBlock;
 
 	private ServerBlockList(Module module, List<String> defaults, @Nullable Runnable onBlock) {
 		this.onBlock = onBlock;
+		BY_MODULE.put(module, this);
 		blocked = module.add(new StringListSetting("blocked_servers", defaults));
 		module.add(new ButtonSetting("server", this::serverText, this::serverButtonText, this::toggleCurrentServer));
 		module.add(new ButtonSetting("server_list", this::listText, () -> "Standard", this::resetList));
@@ -33,6 +38,12 @@ public final class ServerBlockList {
 	 */
 	public static ServerBlockList add(Module module, List<String> defaults, @Nullable Runnable onBlock) {
 		return new ServerBlockList(module, defaults, onBlock);
+	}
+
+	/** True if {@code module} has a block list and the current server is on it. */
+	public static boolean blocks(Module module) {
+		ServerBlockList list = BY_MODULE.get(module);
+		return list != null && list.blockedHere();
 	}
 
 	/** Host of the server you're on, lower case without port; null in singleplayer. */

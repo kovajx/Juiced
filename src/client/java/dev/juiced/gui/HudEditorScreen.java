@@ -3,6 +3,8 @@ package dev.juiced.gui;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.jspecify.annotations.Nullable;
+
 import com.mojang.blaze3d.platform.cursor.CursorTypes;
 
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -59,6 +61,12 @@ public class HudEditorScreen extends Screen {
 	private boolean panelOpen = true;
 	private int mouseX;
 	private int mouseY;
+
+	/** Opens the editor with {@code preselect} selected, shown even while it is switched off (from the Weltprobe menu). */
+	public HudEditorScreen(Screen parent, @Nullable HudModule preselect) {
+		this(parent);
+		// TODO(gui-support): select preselect and show it even when off
+	}
 
 	public HudEditorScreen(Screen parent) {
 		super(Component.literal("HUD bearbeiten"));
@@ -195,7 +203,7 @@ public class HudEditorScreen extends Screen {
 		for (int i = 0; i < modules.size(); i++) {
 			HudModule module = modules.get(i);
 			int ry = y + 18 + i * rowH;
-			boolean on = module.isEnabled();
+			boolean on = module.isSwitchedOn();
 			boolean hover = mouseX >= x + 3 && mouseX < x + w - 3 && mouseY >= ry && mouseY < ry + rowH;
 
 			if (hover) {
@@ -206,7 +214,7 @@ public class HudEditorScreen extends Screen {
 			Gui2D.text(g, module.name, x + 18, ry + 3, on ? TEXT : DIM, false, 0.75f);
 			addButton(module.name, x + 3, ry, x + w - 3, ry + rowH, () -> {
 				module.toggle();
-				Fx.sound("ui.button.click", 0.25f, module.isEnabled() ? 1.4f : 0.8f);
+				Fx.sound("ui.button.click", 0.25f, module.isSwitchedOn() ? 1.4f : 0.8f);
 			});
 		}
 	}

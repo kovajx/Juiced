@@ -28,6 +28,11 @@ public final class Theme {
 		return Colors.mixRgb(first, theme.secondary.rgb(offset), pingPong);
 	}
 
+	/** True if the player picked the older card deck as the Shift menu instead of the Weltprobe. */
+	public static boolean classicMenu() {
+		return theme != null && theme.menuStyle.is(1);
+	}
+
 	public static int accent() {
 		return accent(0f);
 	}

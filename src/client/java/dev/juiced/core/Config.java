@@ -129,7 +129,7 @@ public final class Config {
 
 		for (Module module : ModuleManager.all()) {
 			JsonObject saved = new JsonObject();
-			saved.addProperty("enabled", module.isEnabled());
+			saved.addProperty("enabled", module.isSwitchedOn());
 			JsonObject settings = new JsonObject();
 
 			for (Setting<?> setting : module.settings) {

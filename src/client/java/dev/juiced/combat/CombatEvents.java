@@ -58,6 +58,10 @@ public final class CombatEvents {
 	private static float lastReach = -1f;
 	private static long lastReachTick = -1000;
 	private static boolean lastHitSprint;
+	/** Client-only entities the menu puts in the world (the straw dummy): never tracked, so nothing reaches other modules. */
+	private static final Set<Integer> IGNORED = new HashSet<>();
+	private static boolean sprintBeforeProbe;
+	private static boolean probing;
 
 	private CombatEvents() {
 	}
@@ -96,6 +100,58 @@ public final class CombatEvents {
 		return lastHitSprint;
 	}
 
+	// ---- menu probe (Weltprobe straw dummy) ----------------------------------------------------
+
+	/** Leaves an entity out of all tracking (health, kills, jumps, totems), or takes it back in. */
+	public static void ignore(int entityId, boolean ignore) {
+		if (ignore) {
+			IGNORED.add(entityId);
+		} else {
+			IGNORED.remove(entityId);
+		}
+	}
+
+	/**
+	 * The menu hit its straw dummy: makes it the target and records the hit like a real one (crit, sprint), so
+	 * modules that read this state (target marker, knockback comet) react. Dispatches nothing and leaves your reach alone.
+	 */
+	public static void probeHit(LivingEntity dummy, boolean crit, boolean sprint) {
+		if (!probing) {
+			probing = true;
+			sprintBeforeProbe = lastHitSprint;
+		}
+
+		int id = dummy.getId();
+		RECENTLY_HIT.put(id, tick);
+		LAST_HIT_CRIT.put(id, crit);
+		lastHitTick = tick;
+		lastHitEntity = id;
+		lastHitSprint = sprint;
+		setTarget(dummy);
+	}
+
+	/** The menu is done with its dummy: forget it as target and restore the real last hit. */
+	public static void endProbe(@Nullable LivingEntity dummy) {
+		if (dummy != null) {
+			int id = dummy.getId();
+			RECENTLY_HIT.remove(id);
+			LAST_HIT_CRIT.remove(id);
+
+			if (target == dummy) {
+				target = null;
+			}
+
+			if (lastHitEntity == id) {
+				lastHitEntity = -1;
+			}
+		}
+
+		if (probing) {
+			probing = false;
+			lastHitSprint = sprintBeforeProbe;
+		}
+	}
+
 	// ---- hooks ----------------------------------------------------------------------------
 
 	/** Fabric's AttackEntityCallback; fires on your client right before the attack is sent. */
@@ -113,7 +169,7 @@ public final class CombatEvents {
 
 	/** Called from LivingEntityMixin for every entity event the server sends (35 = totem used). */
 	public static void onEntityEvent(LivingEntity entity, byte event) {
-		if (event != 35 || Minecraft.getInstance().level == null) {
+		if (event != 35 || Minecraft.getInstance().level == null || IGNORED.contains(entity.getId())) {
 			return;
 		}
 
@@ -146,6 +202,11 @@ public final class CombatEvents {
 			}
 
 			int id = entity.getId();
+
+			if (IGNORED.contains(id)) {
+				continue;
+			}
+
 			SEEN.add(id);
 
 			Integer previousHurtTime = LAST_HURT_TIME.put(id, living.hurtTime);
