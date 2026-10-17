@@ -19,8 +19,6 @@ import dev.juiced.render.Pose3;
 
 /** Cat ears, bunny ears, devil horns or ram horns on your head. */
 public final class Ears extends CosmeticModule {
-	private static final float TOP = 0.47f;
-
 	private final ChoiceSetting kind = add(new ChoiceSetting("kind", "Art", 0, "Katzenohren", "Hasenohren", "Teufelshörner", "Widderhörner", "Fuchsohren", "Elfenohren", "Bärenohren", "Fühler"));
 	private final ColorSetting color = add(new ColorSetting("color", "Farbe", Colors.BLACK, true));
 	private final ColorSetting inner = add(new ColorSetting("inner", "Innenfarbe", Colors.PINK, true));
@@ -82,7 +80,7 @@ public final class Ears extends CosmeticModule {
 	}
 
 	private void cat(Geo geo, int sideSign, float s, int main, int in, float wiggle) {
-		Pose3 ear = headPose().move(sideSign * 0.15, TOP - 0.02, 0.02).roll(sideSign * 14 + wiggle * sideSign).pitch(-6);
+		Pose3 ear = headPose().move(sideSign * 0.15, HEAD_TOP - 0.02, 0.02).roll(sideSign * 14 + wiggle * sideSign).pitch(-6);
 		float w = 0.085f * s;
 		float h = 0.15f * s;
 		// Counter-clockwise in the ear's right/up plane
@@ -94,7 +92,7 @@ public final class Ears extends CosmeticModule {
 	private void fox(Geo geo, int sideSign, float s, int main, int in, float wiggle) {
 		int fur = color.get() == Colors.BLACK ? 0xE8752B : main;
 		int inside = inner.get() == Colors.PINK ? 0xF4F1EA : in;
-		Pose3 ear = headPose().move(sideSign * 0.14, TOP - 0.02, 0.0).roll(sideSign * 10 + wiggle * sideSign).pitch(-4);
+		Pose3 ear = headPose().move(sideSign * 0.14, HEAD_TOP - 0.02, 0.0).roll(sideSign * 10 + wiggle * sideSign).pitch(-4);
 		float w = 0.075f * s;
 		float h = 0.2f * s;
 		geo.prism(ear, new float[] {-w, w, sideSign * 0.01f * s}, new float[] {0, 0, h}, 0.012f * s, fur, 1f);
@@ -114,7 +112,7 @@ public final class Ears extends CosmeticModule {
 	private void bear(Geo geo, int sideSign, float s, int main, int in, float wiggle) {
 		int fur = color.get() == Colors.BLACK ? 0x8B5A2B : main;
 		int inside = inner.get() == Colors.PINK ? 0xD9A066 : in;
-		Pose3 ear = headPose().move(sideSign * 0.17, TOP - 0.035, -0.01).roll(sideSign * 12 + wiggle * 0.4f * sideSign);
+		Pose3 ear = headPose().move(sideSign * 0.17, HEAD_TOP - 0.035, -0.01).roll(sideSign * 12 + wiggle * 0.4f * sideSign);
 		geo.prism(ear, halfCircleX(0.08f * s), halfCircleY(0.08f * s), 0.02f * s, fur, 1f);
 		geo.prism(ear.copy().move(0, 0.008 * s, 0.021 * s), halfCircleX(0.048f * s), halfCircleY(0.048f * s), 0.003f * s, inside, 1f);
 	}
@@ -144,7 +142,7 @@ public final class Ears extends CosmeticModule {
 	private void antenna(Geo geo, int sideSign, float s, float wiggle) {
 		int stalk = color.get() == Colors.BLACK ? 0x2A2A30 : color.rgb();
 		float time = Clock.tf();
-		Pose3 part = headPose().move(sideSign * 0.1, TOP, 0.06).roll(sideSign * 18).pitch(-15);
+		Pose3 part = headPose().move(sideSign * 0.1, HEAD_TOP, 0.06).roll(sideSign * 18).pitch(-15);
 		float sway = (float) Math.sin(time * 2.2f + sideSign) * 6f + wiggle * 0.6f + flop * 25f;
 		geo.beginModel();
 
@@ -161,7 +159,7 @@ public final class Ears extends CosmeticModule {
 
 	private void bunny(Geo geo, int sideSign, float s, int main, int in, float wiggle) {
 		float back = -10f - flop * 30f;
-		Pose3 ear = headPose().move(sideSign * 0.1, TOP - 0.02, -0.03).roll(sideSign * 9 + wiggle * 0.5f * sideSign).pitch(back);
+		Pose3 ear = headPose().move(sideSign * 0.1, HEAD_TOP - 0.02, -0.03).roll(sideSign * 9 + wiggle * 0.5f * sideSign).pitch(back);
 		Pose3 center = ear.copy().move(0, 0.17 * s, 0);
 		geo.beginModel();
 		geo.box(center, 0.045f * s, 0.17f * s, 0.018f * s, main, 1f);
@@ -171,7 +169,7 @@ public final class Ears extends CosmeticModule {
 
 	private void devil(Geo geo, int sideSign, float s, int main) {
 		int rgb = color.get() == Colors.BLACK ? 0xC0201A : main;
-		Pose3 horn = headPose().move(sideSign * 0.15, TOP - 0.05, 0.12).roll(sideSign * 18);
+		Pose3 horn = headPose().move(sideSign * 0.15, HEAD_TOP - 0.05, 0.12).roll(sideSign * 18);
 		geo.beginModel();
 
 		for (int i = 0; i < 4; i++) {
@@ -185,7 +183,7 @@ public final class Ears extends CosmeticModule {
 
 	private void ram(Geo geo, int sideSign, float s, int main) {
 		int rgb = color.get() == Colors.BLACK ? 0xC9B48E : main;
-		Pose3 horn = headPose().move(sideSign * 0.22, TOP - 0.1, 0.03).yaw(sideSign * 90).pitch(-55);
+		Pose3 horn = headPose().move(sideSign * 0.22, HEAD_TOP - 0.1, 0.03).yaw(sideSign * 90).pitch(-55);
 		geo.beginModel();
 
 		for (int i = 0; i < 9; i++) {

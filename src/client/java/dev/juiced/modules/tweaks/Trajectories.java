@@ -1,5 +1,7 @@
 package dev.juiced.modules.tweaks;
 
+import java.util.List;
+
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -18,6 +20,7 @@ import dev.juiced.core.Category;
 import dev.juiced.core.Clock;
 import dev.juiced.core.Colors;
 import dev.juiced.core.Module;
+import dev.juiced.core.ServerBlockList;
 import dev.juiced.core.Theme;
 import dev.juiced.core.setting.BoolSetting;
 import dev.juiced.core.setting.ColorSetting;
@@ -35,6 +38,7 @@ public final class Trajectories extends Module {
 	private final BoolSetting pearls = add(new BoolSetting("pearls", "Enderperlen", true));
 	private final BoolSetting bows = add(new BoolSetting("bows", "Bogen & Armbrust", true));
 	private final BoolSetting others = add(new BoolSetting("others", "Dreizack, Windkugel, Tränke", true));
+	private final ServerBlockList servers = ServerBlockList.add(this, List.of(), null);
 
 	private final float[] px = new float[MAX_STEPS + 1];
 	private final float[] py = new float[MAX_STEPS + 1];
@@ -44,7 +48,8 @@ public final class Trajectories extends Module {
 
 	public Trajectories() {
 		super("trajectories", "Flugbahn", Category.TWEAKS, true,
-				"Zeigt beim Zielen, wo deine Perle, dein Pfeil oder deine Windkugel landet. Perfekt für Pearl-Clutches.");
+				"Zeigt beim Zielen, wo deine Perle, dein Pfeil oder deine Windkugel landet. Perfekt für Pearl-Clutches. "
+						+ "Auf Servern, die du sperrst, bleibt es aus.");
 	}
 
 	/** Physics for one kind of projectile. {@code arrowOrder}: move first, then drag and gravity. */
@@ -106,7 +111,7 @@ public final class Trajectories extends Module {
 		LocalPlayer player = minecraft.player;
 		ClientLevel level = minecraft.level;
 
-		if (player == null || level == null) {
+		if (player == null || level == null || servers.blockedHere()) {
 			return;
 		}
 

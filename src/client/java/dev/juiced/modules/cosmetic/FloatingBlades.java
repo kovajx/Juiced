@@ -55,6 +55,8 @@ public final class FloatingBlades extends CosmeticModule {
 		spin += dt * speed.f() * (0.9f + burst * 5f);
 		int n = Math.max(1, count.i());
 		float s = size.f();
+		// The crown floats over the head and follows it
+		Pose3 above = layout.index() == 2 ? aboveHead() : null;
 
 		for (int i = 0; i < n; i++) {
 			float k = n == 1 ? 0.5f : i / (float) (n - 1);
@@ -74,7 +76,7 @@ public final class FloatingBlades extends CosmeticModule {
 					float angle = (float) Math.toDegrees(spin * 0.6f) + i * 360f / n;
 					scale = s * 0.6f;
 					double radius = 0.3 + burst * 0.3;
-					pose = Pose3.at(px, py + height + 0.2 + bob, pz, angle).move(0, 0, radius).pitch(18 + burst * 30).move(0, 0.12 * scale, 0);
+					pose = Pose3.at(above.x, above.y + 0.1 + bob, above.z, angle).move(0, 0, radius).pitch(18 + burst * 30).move(0, 0.12 * scale, 0);
 				}
 				case 3 -> {
 					// Two wings of blades, half on each side, sweeping out and up

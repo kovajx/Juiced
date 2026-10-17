@@ -1,18 +1,33 @@
 package dev.juiced.modules.cosmetic;
 
+import java.util.Locale;
+
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 
 import dev.juiced.core.Category;
 import dev.juiced.core.Module;
+import dev.juiced.core.setting.ButtonSetting;
+import dev.juiced.core.setting.Setting;
+import dev.juiced.core.setting.SliderSetting;
 import dev.juiced.render.Geo;
 import dev.juiced.render.Pose3;
 
 /**
  * Base for cosmetics drawn on your own player. Only visible in third person (F5),
  * and only on your screen.
+ *
+ * <p>Every cosmetic gets three position sliders (height, forward, sideways) at the end of its
+ * settings, so it can be nudged to fit skins and other cosmetics.
  */
 public abstract class CosmeticModule extends Module {
+	/** Top of the head above the neck pivot: 8 skin pixels at the player's 15/16 render scale. */
+	protected static final float HEAD_TOP = 0.47f;
+	/** Half size of the head's outer skin layer (hair, hats), half a skin pixel bigger than the head on every side. */
+	protected static final float HEAD_OUTER = 0.264f;
+	/** Top of the outer skin layer (hair) above the neck pivot. Hats rest on it so hair never pokes through. */
+	protected static final float HAIR_TOP = HEAD_TOP / 2 + HEAD_OUTER;
+
 	protected LocalPlayer player;
 	/** Interpolated feet position. */
 	protected double px;
@@ -25,6 +40,7 @@ public abstract class CosmeticModule extends Module {
 	/** Head pitch in degrees (positive = looking down). */
 	protected float headPitch;
 	protected float eyeHeight;
+	/** True while the player model is in its crouch pose (not just while sneak is held, e.g. when flying). */
 	protected boolean crouching;
 	protected float partialTick;
 
@@ -34,8 +50,45 @@ public abstract class CosmeticModule extends Module {
 	private float headPrevious;
 	private float headCurrent;
 
+	private final SliderSetting offsetUp;
+	private final SliderSetting offsetForward;
+	private final SliderSetting offsetSide;
+	private boolean onGround;
+	// This frame's position offset in the world, already added to px/py/pz
+	private double shiftX;
+	private double shiftY;
+	private double shiftZ;
+
 	protected CosmeticModule(String id, String name, String description) {
 		super(id, name, Category.COSMETICS, false, description);
+		// Created before the subclass's own settings, but add() below keeps these four at the end
+		offsetUp = super.add(new SliderSetting("offset_up", "Höhe", -0.5, 0.5, 0.02, 0, CosmeticModule::signed));
+		offsetForward = super.add(new SliderSetting("offset_forward", "Vorne/Hinten", -0.4, 0.4, 0.02, 0, CosmeticModule::signed));
+		offsetSide = super.add(new SliderSetting("offset_side", "Links/Rechts", -0.4, 0.4, 0.02, 0, CosmeticModule::signed));
+		super.add(new ButtonSetting("offset_reset", () -> "Position", () -> "Zurücksetzen", this::resetPosition));
+	}
+
+	/** The cosmetic's own settings go in front of the position settings. */
+	@Override
+	protected <S extends Setting<?>> S add(S setting) {
+		settings.add(settings.indexOf(offsetUp), setting);
+		return setting;
+	}
+
+	/** For cosmetics that lie on the ground (the shadow pet): no height slider, they only move sideways. */
+	protected final void keepOnGround() {
+		onGround = true;
+		offsetUp.showIf(() -> false);
+	}
+
+	private void resetPosition() {
+		offsetUp.reset();
+		offsetForward.reset();
+		offsetSide.reset();
+	}
+
+	private static String signed(double value) {
+		return Math.abs(value) < 0.005 ? "0" : String.format(Locale.ROOT, "%+.2f", value);
 	}
 
 	@Override
@@ -76,8 +129,34 @@ public abstract class CosmeticModule extends Module {
 		height = player.getBbHeight();
 		headPitch = player.getXRot(pt);
 		eyeHeight = player.getEyeHeight();
-		crouching = player.isShiftKeyDown();
+		crouching = player.isCrouching();
+		applyOffset();
 		draw(geo);
+	}
+
+	/**
+	 * Moves the anchor by the position settings: up, and forward/right of where the body faces.
+	 * Everything is drawn from px/py/pz (directly or through the poses below), so all parts move together.
+	 * Head items get the same offset along the head's own axes instead (see {@link #headPose()}).
+	 */
+	private void applyOffset() {
+		float forward = offsetForward.f();
+		float side = offsetSide.f();
+		shiftX = 0;
+		shiftY = onGround ? 0 : offsetUp.f();
+		shiftZ = 0;
+
+		if (forward != 0f || side != 0f) {
+			double yaw = Math.toRadians(bodyYaw);
+			double sin = Math.sin(yaw);
+			double cos = Math.cos(yaw);
+			shiftX = -sin * forward - cos * side;
+			shiftZ = cos * forward - sin * side;
+		}
+
+		px += shiftX;
+		py += shiftY;
+		pz += shiftZ;
 	}
 
 	/** Cosmetics that should also be visible in first person (like a pet) return true. */
@@ -85,9 +164,34 @@ public abstract class CosmeticModule extends Module {
 		return false;
 	}
 
-	/** Pose at the neck, turned and tilted with the head. Head is about 0.47 blocks big. */
+	/**
+	 * Pose at the neck, turned and tilted with the head. The top of the head is {@link #HEAD_TOP} above it.
+	 * The position settings move it along the head's own axes, so a raised hat stays on the head
+	 * when you look up or down or turn your head.
+	 */
 	protected Pose3 headPose() {
-		return Pose3.at(px, py + eyeHeight - 0.22, pz, headYaw).pitch(headPitch);
+		return neck().move(offsetSide.f(), offsetUp.f(), offsetForward.f());
+	}
+
+	/**
+	 * Level pose above the middle of the head, at the height of its highest corner (outer skin layer
+	 * included), turned with the head. For things that float over the head: they stay upright but
+	 * follow the head when it turns, tilts or ducks, and never sink into it.
+	 */
+	protected Pose3 aboveHead() {
+		Pose3 head = neck().move(0, HEAD_TOP / 2, 0);
+		double top = head.y + HEAD_OUTER * (Math.abs(head.ry) + Math.abs(head.uy) + Math.abs(head.fy));
+		return Pose3.at(head.x, top, head.z, headYaw).move(offsetSide.f(), offsetUp.f(), offsetForward.f());
+	}
+
+	/**
+	 * The real neck, without the position settings. Its height is a share of the eye height taken from the
+	 * player model (1.406 of 1.62 standing; 1.035 of 1.27 crouching, where the head drops 4.2 model pixels
+	 * and the whole model 2/16 block), so it also fits players of other sizes.
+	 */
+	private Pose3 neck() {
+		float neck = eyeHeight * (crouching ? 0.8151f : 0.8681f);
+		return Pose3.at(px - shiftX, py - shiftY + neck, pz - shiftZ, headYaw).pitch(headPitch);
 	}
 
 	/** Pose at the feet, turned with the body. */

@@ -57,6 +57,7 @@ public final class CombatEvents {
 	private static boolean wasDead;
 	private static float lastReach = -1f;
 	private static long lastReachTick = -1000;
+	private static boolean lastHitSprint;
 
 	private CombatEvents() {
 	}
@@ -87,6 +88,14 @@ public final class CombatEvents {
 		return tick - lastReachTick;
 	}
 
+	/**
+	 * True when your last landed hit was a sprint hit at full strength, which vanilla rewards with extra
+	 * knockback. Read it inside {@code Module.onHit}; it describes your client at the moment you swung.
+	 */
+	public static boolean lastHitSprint() {
+		return lastHitSprint;
+	}
+
 	// ---- hooks ----------------------------------------------------------------------------
 
 	/** Fabric's AttackEntityCallback; fires on your client right before the attack is sent. */
@@ -96,7 +105,9 @@ public final class CombatEvents {
 		}
 
 		boolean fullStrength = player.getAttackStrengthScale(0.5F) > 0.9F;
-		PENDING_SWINGS.put(entity.getId(), new Swing(tick, fullStrength && canCrit(player, entity), reach(player, entity)));
+		// Sampled here because vanilla's attack clears sprinting right after a sprint hit
+		boolean sprintHit = fullStrength && player.isSprinting();
+		PENDING_SWINGS.put(entity.getId(), new Swing(tick, fullStrength && canCrit(player, entity), sprintHit, reach(player, entity)));
 		return InteractionResult.PASS;
 	}
 
@@ -167,6 +178,7 @@ public final class CombatEvents {
 					lastHitEntity = id;
 					lastReach = swing.reach;
 					lastReachTick = tick;
+					lastHitSprint = swing.sprint;
 					setTarget(living);
 					ModuleManager.hit(living, swing.crit);
 				}
@@ -307,7 +319,7 @@ public final class CombatEvents {
 				&& target instanceof LivingEntity;
 	}
 
-	private record Swing(long tick, boolean crit, float reach) {
+	private record Swing(long tick, boolean crit, boolean sprint, float reach) {
 	}
 
 	private static final class AirState {
