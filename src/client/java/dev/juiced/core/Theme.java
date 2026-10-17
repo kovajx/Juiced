@@ -33,6 +33,18 @@ public final class Theme {
 		return theme != null && theme.menuStyle.is(1);
 	}
 
+	/** How often the Weltprobe menu has been opened (counts up to 99). */
+	public static int menuOpens() {
+		return theme == null ? 99 : theme.menuOpens.i();
+	}
+
+	/** Counts one more opening of the Weltprobe menu. */
+	public static void countMenuOpen() {
+		if (theme != null && theme.menuOpens.i() < 99) {
+			theme.menuOpens.set(theme.menuOpens.get() + 1);
+		}
+	}
+
 	public static int accent() {
 		return accent(0f);
 	}
