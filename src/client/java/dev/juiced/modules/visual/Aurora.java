@@ -1,5 +1,7 @@
 package dev.juiced.modules.visual;
 
+import org.jspecify.annotations.Nullable;
+
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -42,6 +44,8 @@ public final class Aurora extends Module {
 	private final BoolSetting always = add(new BoolSetting("always", "Auch tagsüber", false));
 
 	private float visible;
+	/** When the menu last showed this; it fades in quicker there, so zapping past it isn't an empty sky. */
+	private double probeSeen = -1;
 
 	public Aurora() {
 		super("aurora", "Polarlicht", Category.VISUALS, true,
@@ -51,6 +55,22 @@ public final class Aurora extends Module {
 	@Override
 	protected void onDisable() {
 		visible = 0f;
+	}
+
+	@Override
+	public void probeTick(Minecraft minecraft, int ticks) {
+		probeSeen = Clock.t();
+	}
+
+	@Override
+	public @Nullable String probeLiveReason(Minecraft minecraft) {
+		String sky = SkyCheck.reason(minecraft);
+
+		if (sky != null || always.on() || minecraft.player == null || minecraft.level == null) {
+			return sky;
+		}
+
+		return Sky.night(minecraft.level, minecraft.player.blockPosition()) < 0.3f ? "Nur nachts" : null;
 	}
 
 	@Override
@@ -70,7 +90,7 @@ public final class Aurora extends Module {
 		}
 
 		// Fades in and out over a few seconds instead of popping
-		visible = Clock.approach(visible, target, 0.5f);
+		visible = Clock.approach(visible, target, Clock.t() - probeSeen < 0.3 ? 2.5f : 0.5f);
 
 		if (visible < 0.01f) {
 			return;

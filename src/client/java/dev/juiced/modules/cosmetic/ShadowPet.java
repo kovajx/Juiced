@@ -1,5 +1,7 @@
 package dev.juiced.modules.cosmetic;
 
+import org.jspecify.annotations.Nullable;
+
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -209,6 +211,8 @@ public final class ShadowPet extends CosmeticModule {
 	private final BlockPos.MutableBlockPos probe = new BlockPos.MutableBlockPos();
 	private double groundY;
 	private boolean hasGround;
+	/** When the menu last showed the shadow; it fades in quicker there (it starts dark every time it is tuned in). */
+	private double probeSeen = -1;
 	private float groundLift;
 
 	// Reused buffers: the outline in side view, then on the ground (camera relative)
@@ -244,6 +248,23 @@ public final class ShadowPet extends CosmeticModule {
 		light = 0f;
 		still = 0f;
 		sit = 0f;
+	}
+
+	@Override
+	public void probeTick(Minecraft minecraft, int ticks) {
+		probeSeen = Clock.t();
+	}
+
+	/** The shadow lies on the ground under you; high in the air or swimming there is none. */
+	@Override
+	public @Nullable String probeLiveReason(Minecraft minecraft) {
+		LocalPlayer self = minecraft.player;
+
+		if (self != null && !self.onGround() && (!hasGround || self.isInWater())) {
+			return "Braucht Boden unter dir";
+		}
+
+		return super.probeLiveReason(minecraft);
 	}
 
 	// ---- light and ground, once per tick ------------------------------------------------------
@@ -411,7 +432,7 @@ public final class ShadowPet extends CosmeticModule {
 		castAngle = (float) Math.IEEEremainder(castAngle + Clock.approach(0f, turn, 1.5f), Math.PI * 2);
 		castLength = Clock.approach(castLength, aimLength, 1.5f);
 		soft = Clock.approach(soft, aimSoft, 1.5f);
-		light = Clock.approach(light, aimLight, 1.5f);
+		light = Clock.approach(light, aimLight, Clock.t() - probeSeen < 0.3 ? 4f : 1.5f);
 		night = Clock.approach(night, aimNight, 1f);
 
 		// Nothing to land on, or swimming (the water surface would need its own shadow)

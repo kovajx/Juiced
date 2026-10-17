@@ -2,6 +2,8 @@ package dev.juiced.modules.cosmetic;
 
 import java.util.Locale;
 
+import org.jspecify.annotations.Nullable;
+
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 
@@ -89,6 +91,29 @@ public abstract class CosmeticModule extends Module {
 
 	private static String signed(double value) {
 		return Math.abs(value) < 0.005 ? "0" : String.format(Locale.ROOT, "%+.2f", value);
+	}
+
+	/**
+	 * Starting to show (switched on, worn in the wardrobe or tried out in the menu): the turn between ticks
+	 * starts from where you face now, not from wherever you faced when it last ran.
+	 */
+	@Override
+	protected void onEnable() {
+		LocalPlayer self = Minecraft.getInstance().player;
+
+		if (self != null) {
+			bodyPrevious = self.yBodyRot;
+			bodyCurrent = self.yBodyRot;
+			headPrevious = self.yHeadRot;
+			headCurrent = self.yHeadRot;
+		}
+	}
+
+	/** Cosmetics are drawn on your player model, which isn't drawn while you are invisible. */
+	@Override
+	public @Nullable String probeLiveReason(Minecraft minecraft) {
+		LocalPlayer self = minecraft.player;
+		return self != null && self.isInvisible() ? "Du bist unsichtbar" : null;
 	}
 
 	@Override

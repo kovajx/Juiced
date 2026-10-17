@@ -2,6 +2,9 @@ package dev.juiced.modules.combat;
 
 import java.util.concurrent.ThreadLocalRandom;
 
+import org.jspecify.annotations.Nullable;
+
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.world.entity.LivingEntity;
 
@@ -45,6 +48,12 @@ public final class HitSounds extends Module {
 	public void onKill(LivingEntity target) {
 		Fx.sound("entity.experience_orb.pickup", killVolume.f(), 0.7f);
 		Fx.sound(SOUNDS[sound.index()], killVolume.f(), pitch.f() * 1.5f);
+	}
+
+	/** In the menu the dummy only wobbles; what you'd notice is the sound, so a silent setting is worth saying. */
+	@Override
+	public @Nullable String probeLiveReason(Minecraft minecraft) {
+		return volume.f() <= 0.001f ? "Lautstärke steht auf 0" : null;
 	}
 
 	@Override

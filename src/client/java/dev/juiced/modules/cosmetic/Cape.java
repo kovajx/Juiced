@@ -1,5 +1,7 @@
 package dev.juiced.modules.cosmetic;
 
+import org.jspecify.annotations.Nullable;
+
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.player.LocalPlayer;
@@ -65,6 +67,28 @@ public final class Cape extends CosmeticModule {
 	/** True while the player's real cape should be hidden so it doesn't overlap ours. */
 	public static boolean hidesVanilla() {
 		return INSTANCE != null && INSTANCE.isEnabled() && INSTANCE.hideVanilla.on();
+	}
+
+	/** Hangs at rest when it shows again; without this, the distance walked meanwhile reads as one huge swing. */
+	@Override
+	protected void onDisable() {
+		hasLast = false;
+		angle = 6f;
+		targetAngle = 6f;
+		roll = 0f;
+		targetRoll = 0f;
+		speed = 0f;
+	}
+
+	@Override
+	public @Nullable String probeLiveReason(Minecraft minecraft) {
+		LocalPlayer self = minecraft.player;
+
+		if (self != null && self.getItemBySlot(EquipmentSlot.CHEST).is(Items.ELYTRA)) {
+			return "Nicht mit Elytra";
+		}
+
+		return super.probeLiveReason(minecraft);
 	}
 
 	@Override

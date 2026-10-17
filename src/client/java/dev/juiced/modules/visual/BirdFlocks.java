@@ -2,6 +2,8 @@ package dev.juiced.modules.visual;
 
 import java.util.concurrent.ThreadLocalRandom;
 
+import org.jspecify.annotations.Nullable;
+
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -13,6 +15,7 @@ import dev.juiced.core.Colors;
 import dev.juiced.core.Module;
 import dev.juiced.core.setting.ChoiceSetting;
 import dev.juiced.core.setting.SliderSetting;
+import dev.juiced.render.FreeCamera;
 import dev.juiced.render.Geo;
 import dev.juiced.render.Gui2D;
 import dev.juiced.render.Sky;
@@ -25,6 +28,9 @@ public final class BirdFlocks extends Module {
 	private static final int FLOCKS = 2;
 	private static final int MAX_BIRDS = 11;
 	private static final float SPEED = 7f;
+	private static final double HALF_PATH = 75;
+	/** Ticks after tuning in before the menu sends a flock, so its camera has arrived. */
+	private static final int PROBE_DELAY = 24;
 
 	private final ChoiceSetting kind = add(new ChoiceSetting("kind", "Art", 0, "Silhouetten", "Möwen"));
 	private final SliderSetting frequency = add(SliderSetting.percent("frequency", "Häufigkeit", 0.3, 3.0, 1.0));
@@ -44,6 +50,8 @@ public final class BirdFlocks extends Module {
 	private final float[][] phase = new float[FLOCKS][MAX_BIRDS];
 
 	private float nextFlock = 6f;
+	/** The flock the menu sent last, or -1. */
+	private int probeFlock = -1;
 
 	public BirdFlocks() {
 		super("birds", "Vogelschwärme", Category.VISUALS, true,
@@ -71,7 +79,7 @@ public final class BirdFlocks extends Module {
 		double px = geo.x(player);
 		double py = geo.y(player);
 		double pz = geo.z(player);
-		boolean weather = Sky.overworld(level) && !level.isRaining() && Sky.day(level, player.blockPosition()) > 0.3f;
+		boolean weather = flyingWeather(level, player);
 
 		nextFlock -= dt * frequency.f();
 
@@ -99,8 +107,79 @@ public final class BirdFlocks extends Module {
 		}
 	}
 
+	private static boolean flyingWeather(ClientLevel level, LocalPlayer player) {
+		return Sky.overworld(level) && !level.isRaining() && Sky.day(level, player.blockPosition()) > 0.3f;
+	}
+
+	/**
+	 * The menu doesn't wait for the next flock: soon after tuning in, and again whenever the sky is empty,
+	 * one crosses right in front of its camera at the height the camera looks up to.
+	 */
+	@Override
+	public void probeTick(Minecraft minecraft, int ticks) {
+		LocalPlayer player = minecraft.player;
+		ClientLevel level = minecraft.level;
+
+		if (player == null || level == null || ticks < PROBE_DELAY || (probeFlock >= 0 && flying[probeFlock]) || !flyingWeather(level, player)) {
+			return;
+		}
+
+		ThreadLocalRandom random = ThreadLocalRandom.current();
+		double yaw = Math.toRadians(FreeCamera.cameraYaw(player.getYRot()));
+		float up = Math.max(15f, Math.min(60f, -FreeCamera.cameraPitch(player.getXRot())));
+		double distance = 34 + random.nextDouble() * 12;
+		int way = random.nextBoolean() ? 1 : -1;
+		// Flying across the view (along the camera's left or right), with the path the given distance in front
+		double heading = yaw + (way < 0 ? Math.PI : 0);
+		double height = player.getEyeHeight() + distance * Math.tan(Math.toRadians(up));
+		// Already a stretch along the path, so it enters the picture right away instead of in half a minute
+		probeFlock = launch(player.getX(), player.getY(), player.getZ(), heading, way * distance, height, 22f);
+
+		if (probeFlock >= 0) {
+			nextFlock = 25f + random.nextFloat() * 35f;
+		}
+	}
+
+	@Override
+	public @Nullable String probeLiveReason(Minecraft minecraft) {
+		if (anyFlying()) {
+			return null;
+		}
+
+		String sky = SkyCheck.reason(minecraft);
+
+		if (sky != null || minecraft.player == null || minecraft.level == null) {
+			return sky;
+		}
+
+		return Sky.day(minecraft.level, minecraft.player.blockPosition()) > 0.3f ? null : "Nur tagsüber";
+	}
+
+	private boolean anyFlying() {
+		for (boolean f : flying) {
+			if (f) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
 	/** Starts a flock on one side of you that will pass by at some distance. */
 	private void start(double px, double py, double pz) {
+		ThreadLocalRandom random = ThreadLocalRandom.current();
+		double heading = random.nextDouble() * Math.PI * 2;
+		// Pass beside you: shift the path sideways by 15 to 45 blocks
+		double side = (random.nextBoolean() ? 1 : -1) * (15 + random.nextDouble() * 30);
+		launch(px, py, pz, heading, side, 24 + random.nextDouble() * 14, 0f);
+	}
+
+	/**
+	 * A flock on a straight path past you: {@code side} blocks to the left of its heading at the closest point,
+	 * {@code height} above your feet, starting {@code flownAlready} blocks into its path. Returns its slot, or
+	 * -1 if all flocks are in the air.
+	 */
+	private int launch(double px, double py, double pz, double heading, double side, double height, float flownAlready) {
 		int f = -1;
 
 		for (int i = 0; i < FLOCKS; i++) {
@@ -111,23 +190,19 @@ public final class BirdFlocks extends Module {
 		}
 
 		if (f < 0) {
-			return;
+			return -1;
 		}
 
 		ThreadLocalRandom random = ThreadLocalRandom.current();
-		double heading = random.nextDouble() * Math.PI * 2;
 		float hx = (float) Math.cos(heading);
 		float hz = (float) Math.sin(heading);
-		// Pass beside you: shift the path sideways by 15 to 45 blocks
-		double side = (random.nextBoolean() ? 1 : -1) * (15 + random.nextDouble() * 30);
-		double half = 75;
-		startX[f] = px - hx * half - hz * side;
-		startZ[f] = pz - hz * half + hx * side;
-		startY[f] = py + 24 + random.nextDouble() * 14;
+		startX[f] = px - hx * HALF_PATH - hz * side;
+		startZ[f] = pz - hz * HALF_PATH + hx * side;
+		startY[f] = py + height;
 		headingX[f] = hx;
 		headingZ[f] = hz;
-		flown[f] = 0f;
-		length[f] = (float) (half * 2);
+		flown[f] = flownAlready;
+		length[f] = (float) (HALF_PATH * 2);
 		birds[f] = 5 + random.nextInt(MAX_BIRDS - 4);
 
 		for (int b = 0; b < MAX_BIRDS; b++) {
@@ -137,6 +212,7 @@ public final class BirdFlocks extends Module {
 		}
 
 		flying[f] = true;
+		return f;
 	}
 
 	private void drawFlock(Geo geo, int f, float time, float fade) {

@@ -1,6 +1,10 @@
 package dev.juiced.modules.cosmetic;
 
+import org.jspecify.annotations.Nullable;
+
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.player.LocalPlayer;
 
 import dev.juiced.core.Clock;
 import dev.juiced.core.Colors;
@@ -152,6 +156,21 @@ public final class Wings extends CosmeticModule {
 	@Override
 	protected void onDisable() {
 		settled = false;
+	}
+
+	@Override
+	public @Nullable String probeLiveReason(Minecraft minecraft) {
+		LocalPlayer self = minecraft.player;
+
+		if (self != null && self.isFallFlying()) {
+			return "Nicht beim Gleiten";
+		}
+
+		if (self != null && self.isVisuallySwimming()) {
+			return "Nicht beim Schwimmen";
+		}
+
+		return super.probeLiveReason(minecraft);
 	}
 
 	@Override

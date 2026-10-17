@@ -2,8 +2,11 @@ package dev.juiced.modules.visual;
 
 import java.util.concurrent.ThreadLocalRandom;
 
+import org.jspecify.annotations.Nullable;
+
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.particles.ParticleOptions;
 import net.minecraft.core.particles.ParticleTypes;
@@ -16,9 +19,11 @@ import dev.juiced.core.Theme;
 import dev.juiced.core.setting.ChoiceSetting;
 import dev.juiced.core.setting.ColorSetting;
 import dev.juiced.core.setting.SliderSetting;
+import dev.juiced.render.FreeCamera;
 import dev.juiced.render.Geo;
 import dev.juiced.render.Gui2D;
 import dev.juiced.render.Pose3;
+import dev.juiced.render.Sky;
 
 /**
  * Atmosphere around you. Fireflies are drawn by Juiced itself (cheap glowing dots that wander),
@@ -43,6 +48,10 @@ public final class AmbientParticles extends Module {
 	private final float[] life = new float[MAX_FLIES];
 	private int flies;
 	private int drawnStyle = -1;
+	/** When the menu last showed this (see {@link #probeTick}); shooting stars then fall where its camera looks. */
+	private double probeSeen = -1;
+	private float viewYaw;
+	private boolean starsInView;
 
 	public AmbientParticles() {
 		super("ambient", "Ambient-Partikel", Category.VISUALS, false,
@@ -77,6 +86,33 @@ public final class AmbientParticles extends Module {
 		}
 	}
 
+	/**
+	 * Shooting stars normally fall high up in any direction, far above the menu's camera shot. While the
+	 * menu shows them they come lower, sooner and in front of its camera, so a few cross the picture.
+	 */
+	@Override
+	public void probeTick(Minecraft minecraft, int ticks) {
+		LocalPlayer player = minecraft.player;
+
+		if (player != null) {
+			probeSeen = Clock.t();
+			viewYaw = FreeCamera.cameraYaw(player.getYRot());
+		}
+	}
+
+	/** Shooting stars are faint lines that a bright day sky swallows. */
+	@Override
+	public @Nullable String probeLiveReason(Minecraft minecraft) {
+		LocalPlayer player = minecraft.player;
+		ClientLevel level = minecraft.level;
+
+		if (style.index() != 7 || player == null || level == null || !Sky.overworld(level)) {
+			return null;
+		}
+
+		return Sky.night(level, player.blockPosition()) < 0.3f ? "Nur nachts gut zu sehen" : null;
+	}
+
 	/** Fireflies, lanterns and butterflies are drawn by Juiced; the rest are game particles. */
 	private boolean selfDrawn() {
 		int index = style.index();
@@ -92,6 +128,14 @@ public final class AmbientParticles extends Module {
 
 		if (drawnStyle != style.index()) {
 			drawnStyle = style.index();
+			flies = 0;
+		}
+
+		// The menu started or stopped showing the shooting stars: place them anew for its camera
+		boolean inView = style.index() == 7 && Clock.t() - probeSeen < 0.3;
+
+		if (inView != starsInView) {
+			starsInView = inView;
 			flies = 0;
 		}
 
@@ -292,16 +336,26 @@ public final class AmbientParticles extends Module {
 			// Far away and high up, waiting a few seconds before it appears
 			double angle = random.nextDouble() * Math.PI * 2;
 			double distance = 60 + random.nextDouble() * 30;
-			fx[i] = cx + Math.cos(angle) * distance;
-			fy[i] = cy + 35 + random.nextDouble() * 25;
-			fz[i] = cz + Math.sin(angle) * distance;
+			double rise = 35 + random.nextDouble() * 25;
 			double heading = random.nextDouble() * Math.PI * 2;
+
+			if (starsInView) {
+				// In front of the menu camera, 12 to 24 degrees up, falling across the view rather than towards it
+				angle = Math.toRadians(viewYaw) + Math.PI / 2 + (random.nextDouble() - 0.5) * 1.2;
+				rise = distance * Math.tan(Math.toRadians(12 + random.nextDouble() * 12));
+				heading = angle + (random.nextBoolean() ? 1 : -1) * Math.PI / 2 + (random.nextDouble() - 0.5) * 0.8;
+			}
+
+			fx[i] = cx + Math.cos(angle) * distance;
+			fy[i] = cy + rise;
+			fz[i] = cz + Math.sin(angle) * distance;
 			float speed = 28f + random.nextFloat() * 14f;
 			vx[i] = (float) Math.cos(heading) * speed;
 			vz[i] = (float) Math.sin(heading) * speed;
 			vy[i] = -6f - random.nextFloat() * 8f;
 			life[i] = 0.8f + random.nextFloat() * 0.6f;
-			age[i] = -(2f + random.nextFloat() * 8f) / Math.max(0.2f, density.f());
+			float wait = starsInView ? 0.3f + random.nextFloat() * 2.2f : 2f + random.nextFloat() * 8f;
+			age[i] = -wait / Math.max(0.2f, density.f());
 		}
 	}
 

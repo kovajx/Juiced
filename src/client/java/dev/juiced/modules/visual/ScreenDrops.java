@@ -2,6 +2,8 @@ package dev.juiced.modules.visual;
 
 import java.util.concurrent.ThreadLocalRandom;
 
+import org.jspecify.annotations.Nullable;
+
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -45,6 +47,18 @@ public final class ScreenDrops extends Module {
 	@Override
 	protected void onDisable() {
 		java.util.Arrays.fill(alive, false);
+	}
+
+	/** Drops only come from surfacing or from looking up into the rain, neither of which the menu can do for you. */
+	@Override
+	public @Nullable String probeLiveReason(Minecraft minecraft) {
+		for (boolean drop : alive) {
+			if (drop) {
+				return null;
+			}
+		}
+
+		return "Bei Regen oder Auftauchen";
 	}
 
 	@Override

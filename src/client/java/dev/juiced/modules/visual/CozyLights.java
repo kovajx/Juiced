@@ -2,6 +2,8 @@ package dev.juiced.modules.visual;
 
 import java.util.concurrent.ThreadLocalRandom;
 
+import org.jspecify.annotations.Nullable;
+
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 
@@ -58,6 +60,13 @@ public final class CozyLights extends Module {
 	@Override
 	public void tick(Minecraft minecraft) {
 		NearbyBlocks.update(minecraft);
+	}
+
+	@Override
+	public @Nullable String probeLiveReason(Minecraft minecraft) {
+		boolean fire = NearbyBlocks.count(NearbyBlocks.CAMPFIRE) > 0;
+		boolean lamps = candles.on() && (NearbyBlocks.count(NearbyBlocks.CANDLE) > 0 || NearbyBlocks.count(NearbyBlocks.LANTERN) > 0);
+		return fire || lamps ? null : "Braucht Feuer oder Laterne";
 	}
 
 	@Override

@@ -4,6 +4,7 @@ import java.util.concurrent.ThreadLocalRandom;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
 
 import dev.juiced.core.Category;
@@ -16,6 +17,7 @@ import dev.juiced.core.setting.ChoiceSetting;
 import dev.juiced.core.setting.SliderSetting;
 import dev.juiced.render.Geo;
 import dev.juiced.render.Gui2D;
+import dev.juiced.render.NearbyBlocks;
 
 /**
  * Petals or leaves drift down around you, tumble in the wind and settle on the ground,
@@ -55,6 +57,8 @@ public final class Petals extends Module {
 	private final boolean[] alive = new boolean[CAPACITY];
 	private float spawnBudget;
 	private double groundY;
+	/** False until you stood somewhere since the petals started; until then {@link #groundY} is a guess. */
+	private boolean groundKnown;
 	private double lastX;
 	private double lastZ;
 
@@ -66,6 +70,7 @@ public final class Petals extends Module {
 	@Override
 	protected void onDisable() {
 		java.util.Arrays.fill(alive, false);
+		groundKnown = false;
 	}
 
 	private void spawn(double cx, double cy, double cz, double r, boolean nearFeet) {
@@ -111,6 +116,13 @@ public final class Petals extends Module {
 
 		if (player.onGround()) {
 			groundY = py;
+			groundKnown = true;
+		} else if (!groundKnown) {
+			// Started while flying or swimming (the menu can try it out anywhere): fall to the ground below,
+			// or to your feet under a roof, instead of to wherever you last stood
+			ClientLevel level = Minecraft.getInstance().level;
+			int surface = level != null ? NearbyBlocks.surface(level, (int) Math.floor(px), (int) Math.floor(pz), false) : Integer.MAX_VALUE;
+			groundY = surface <= py + 0.5 ? surface : py;
 		}
 
 		double r = radius.get();

@@ -1,5 +1,7 @@
 package dev.juiced.modules.visual;
 
+import org.jspecify.annotations.Nullable;
+
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -9,6 +11,8 @@ import net.minecraft.world.entity.LivingEntity;
 import dev.juiced.core.Category;
 import dev.juiced.core.Clock;
 import dev.juiced.core.Colors;
+import dev.juiced.core.Hud;
+import dev.juiced.core.MenuState;
 import dev.juiced.core.Module;
 import dev.juiced.core.setting.BoolSetting;
 import dev.juiced.core.setting.ChoiceSetting;
@@ -43,6 +47,27 @@ public final class CustomCrosshair extends Module {
 
 	/** Called instead of the vanilla crosshair (see JuicedClient). */
 	public void render(GuiGraphicsExtractor g, DeltaTracker deltaTracker) {
+		drawLive(g);
+	}
+
+	/**
+	 * The Weltprobe menu hides the game's HUD, crosshair included, and draws the tuned module's HUD itself.
+	 * Normally the crosshair comes through {@link #render}, so this only draws while the menu hides the HUD.
+	 */
+	@Override
+	public void renderHud(GuiGraphicsExtractor graphics, Hud hud) {
+		if (MenuState.hidesHud()) {
+			drawLive(graphics);
+		}
+	}
+
+	@Override
+	public @Nullable String probeLiveReason(Minecraft minecraft) {
+		LocalPlayer player = minecraft.player;
+		return player != null && player.isSpectator() ? "Nicht im Zuschauermodus" : null;
+	}
+
+	private void drawLive(GuiGraphicsExtractor g) {
 		Minecraft minecraft = Minecraft.getInstance();
 		LocalPlayer player = minecraft.player;
 

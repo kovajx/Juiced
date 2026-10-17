@@ -2,6 +2,8 @@ package dev.juiced.modules.visual;
 
 import java.util.concurrent.ThreadLocalRandom;
 
+import org.jspecify.annotations.Nullable;
+
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -71,6 +73,19 @@ public final class SunRays extends Module {
 	@Override
 	public void tick(Minecraft minecraft) {
 		NearbyBlocks.update(minecraft);
+	}
+
+	@Override
+	public @Nullable String probeLiveReason(Minecraft minecraft) {
+		LocalPlayer player = minecraft.player;
+		ClientLevel level = minecraft.level;
+
+		if (player == null || level == null) {
+			return null;
+		}
+
+		boolean day = Sky.overworld(level) && !level.isRaining() && Sky.day(level, player.blockPosition()) >= 0.2f;
+		return day && NearbyBlocks.count(NearbyBlocks.LEAVES) >= 12 ? null : "Tagsüber unter Bäumen";
 	}
 
 	@Override

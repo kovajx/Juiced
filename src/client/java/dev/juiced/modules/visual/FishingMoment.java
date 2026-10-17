@@ -2,6 +2,8 @@ package dev.juiced.modules.visual;
 
 import java.util.concurrent.ThreadLocalRandom;
 
+import org.jspecify.annotations.Nullable;
+
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.player.LocalPlayer;
@@ -68,6 +70,16 @@ public final class FishingMoment extends Module {
 	protected void onDisable() {
 		java.util.Arrays.fill(dAlive, false);
 		hookAlive = false;
+	}
+
+	/**
+	 * A bite can't be faked without touching the catch counter and the real bite timing, so the menu shows
+	 * this live only while your line is actually out (then a bite and the catch card work as usual).
+	 */
+	@Override
+	public @Nullable String probeLiveReason(Minecraft minecraft) {
+		LocalPlayer player = minecraft.player;
+		return player != null && player.fishing == null ? "Nur beim Angeln" : null;
 	}
 
 	@Override

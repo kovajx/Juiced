@@ -4,6 +4,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 
+import org.jspecify.annotations.Nullable;
+
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.player.LocalPlayer;
@@ -26,6 +28,11 @@ import dev.juiced.render.Sparks;
 public final class Trails extends Module {
 	private static final int CAPACITY = 61;
 	private static final int MAX_OTHERS = 8;
+	/** Key of the path the menu walks around you while it shows the trail (you stand still while it is open). */
+	private static final int PROBE_KEY = Integer.MIN_VALUE;
+	private static final double PROBE_RADIUS = 1.1;
+	/** Radians per tick: about one lap in 2.6 s, fast enough that the trail stays fully visible. */
+	private static final double PROBE_SPEED = 0.12;
 
 	private final ChoiceSetting style = add(new ChoiceSetting("style", "Stil", 0, "Band", "Linie", "Funken"));
 	private final ColorSetting color = add(new ColorSetting("color", "Farbe", ColorSetting.RAINBOW, true));
@@ -41,6 +48,7 @@ public final class Trails extends Module {
 	private final float[] pz = new float[CAPACITY + 1];
 	private final float[] hw = new float[CAPACITY + 1];
 	private final int[] colors = new int[CAPACITY + 1];
+	private boolean probeFed;
 
 	public Trails() {
 		super("trails", "Trails", Category.VISUALS, false,
@@ -79,16 +87,43 @@ public final class Trails extends Module {
 			}
 		}
 
+		// The menu's path fades like a trail you stopped walking once the menu no longer feeds it
+		History probe = histories.get(PROBE_KEY);
+
+		if (probe != null && !probeFed) {
+			probe.visibility = Math.max(0f, probe.visibility - 0.06f);
+		}
+
+		probeFed = false;
 		histories.values().removeIf(h -> h.lastSeen < Clock.t() - 1.0);
+	}
+
+	/** The menu walks a circle around you, at the height you set, so the trail has a path to follow. */
+	@Override
+	public void probeTick(Minecraft minecraft, int ticks) {
+		LocalPlayer self = minecraft.player;
+
+		if (self == null) {
+			return;
+		}
+
+		History history = histories.computeIfAbsent(PROBE_KEY, id -> new History());
+		history.entity = null;
+		// Counted on rather than taken from the ticks, so tuning back in quickly doesn't jump across the circle
+		history.angle += PROBE_SPEED;
+		probeFed = true;
+		push(history, self.getX() + Math.cos(history.angle) * PROBE_RADIUS, self.getY() + heightOffset(self),
+				self.getZ() + Math.sin(history.angle) * PROBE_RADIUS);
 	}
 
 	private void sample(Entity entity) {
 		History history = histories.computeIfAbsent(entity.getId(), id -> new History());
 		history.entity = entity;
+		push(history, entity.getX(), entity.getY() + heightOffset(entity), entity.getZ());
+	}
+
+	private void push(History history, double x, double y, double z) {
 		history.lastSeen = Clock.t();
-		double x = entity.getX();
-		double y = entity.getY() + heightOffset(entity);
-		double z = entity.getZ();
 		boolean moved = history.size == 0 || history.distanceSqToNewest(x, y, z) > 0.0004;
 		history.push(x, y, z);
 		history.visibility = Math.max(0f, Math.min(1f, history.visibility + (moved ? 0.25f : -0.06f)));
@@ -110,7 +145,8 @@ public final class Trails extends Module {
 				continue;
 			}
 
-			if (history.entity == minecraft.player && hideSelf) {
+			// A null entity is the menu's path around you, which is your trail too
+			if ((history.entity == minecraft.player || history.entity == null) && hideSelf) {
 				continue;
 			}
 
@@ -121,9 +157,25 @@ public final class Trails extends Module {
 	private void draw(Geo geo, History history) {
 		Entity entity = history.entity;
 		int count = Math.min(history.size, length.i());
-		px[0] = geo.rx(geo.x(entity));
-		py[0] = geo.ry(geo.y(entity) + heightOffset(entity));
-		pz[0] = geo.rz(geo.z(entity));
+
+		if (entity != null) {
+			px[0] = geo.rx(geo.x(entity));
+			py[0] = geo.ry(geo.y(entity) + heightOffset(entity));
+			pz[0] = geo.rz(geo.z(entity));
+		} else {
+			// The menu's path: the head runs on along the circle between ticks, so it glides like a real walk
+			LocalPlayer self = Minecraft.getInstance().player;
+
+			if (self == null) {
+				return;
+			}
+
+			double angle = history.angle + PROBE_SPEED * geo.partialTick();
+			px[0] = geo.rx(geo.x(self) + Math.cos(angle) * PROBE_RADIUS);
+			py[0] = geo.ry(geo.y(self) + heightOffset(self));
+			pz[0] = geo.rz(geo.z(self) + Math.sin(angle) * PROBE_RADIUS);
+		}
+
 		int n = 1;
 
 		for (int i = 0; i < count; i++) {
@@ -192,7 +244,10 @@ public final class Trails extends Module {
 		int size;
 		float visibility;
 		double lastSeen;
-		Entity entity;
+		/** The entity this trail follows, or null for the menu's path around you. */
+		@Nullable Entity entity;
+		/** Where on its circle the menu's path is, at the newest sample. */
+		double angle;
 
 		void push(double px, double py, double pz) {
 			head = (head + 1) % CAPACITY;

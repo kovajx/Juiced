@@ -2,6 +2,8 @@ package dev.juiced.modules.visual;
 
 import java.util.concurrent.ThreadLocalRandom;
 
+import org.jspecify.annotations.Nullable;
+
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -51,6 +53,12 @@ public final class FallingLeaves extends Module {
 	@Override
 	public void tick(Minecraft minecraft) {
 		NearbyBlocks.update(minecraft);
+	}
+
+	/** A lone leaf block drops a leaf now and then; it takes a tree for the menu to show something. */
+	@Override
+	public @Nullable String probeLiveReason(Minecraft minecraft) {
+		return NearbyBlocks.count(NearbyBlocks.LEAVES) >= 12 ? null : "Nur unter Bäumen";
 	}
 
 	@Override

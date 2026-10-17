@@ -2,6 +2,7 @@ package dev.juiced.modules.visual;
 
 import org.jspecify.annotations.Nullable;
 
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.state.BlockState;
@@ -44,6 +45,13 @@ public final class BlockOutline extends Module {
 	/** True while the vanilla outline should be hidden. */
 	public static boolean replacesVanilla() {
 		return INSTANCE != null && INSTANCE.isEnabled();
+	}
+
+	/** The outline follows what your crosshair points at, which the menu camera doesn't change. */
+	@Override
+	public @Nullable String probeLiveReason(Minecraft minecraft) {
+		HitResult hit = minecraft.hitResult;
+		return hit instanceof BlockHitResult && hit.getType() != HitResult.Type.MISS ? null : "Schau auf einen Block";
 	}
 
 	/** Called during world extraction with what the crosshair is pointing at. */

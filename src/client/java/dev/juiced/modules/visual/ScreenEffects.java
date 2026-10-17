@@ -46,6 +46,15 @@ public final class ScreenEffects extends Module {
 	}
 
 	@Override
+	public @Nullable String probeLiveReason(Minecraft minecraft) {
+		if (effect() == null) {
+			return "Alles neutral eingestellt";
+		}
+
+		return minecraft.getCameraEntity() == minecraft.player ? null : "Nur aus deiner Sicht";
+	}
+
+	@Override
 	public void tick(Minecraft minecraft) {
 		// While you spectate another entity (creeper, spider) the game shows its own effect in that slot
 		boolean ownView = minecraft.getCameraEntity() == minecraft.player;

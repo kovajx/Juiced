@@ -106,6 +106,12 @@ public final class KnockbackComet extends Module {
 		slot.start(target, CombatEvents.lastHitSprint(), now);
 	}
 
+	/** The menu's straw dummy isn't a player, so with "Nur Spieler" on it never gets a comet. */
+	@Override
+	public @Nullable String probeLiveReason(Minecraft minecraft) {
+		return playersOnly.on() ? "Nur gegen Spieler aktiv" : null;
+	}
+
 	@Override
 	public void tick(Minecraft minecraft) {
 		double now = Clock.t();

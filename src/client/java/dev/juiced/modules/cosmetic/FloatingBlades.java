@@ -1,5 +1,6 @@
 package dev.juiced.modules.cosmetic;
 
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.world.entity.LivingEntity;
 
@@ -43,6 +44,14 @@ public final class FloatingBlades extends CosmeticModule {
 	@Override
 	protected void onDisable() {
 		flare = 0f;
+	}
+
+	/** The blades flare out on a hit; the menu shows that every 3 s, every third time as a crit. */
+	@Override
+	public void probeTick(Minecraft minecraft, int ticks) {
+		if (ticks % 60 == 30) {
+			flare = (ticks / 60) % 3 == 2 ? 1f : Math.max(flare, 0.7f);
+		}
 	}
 
 	@Override
