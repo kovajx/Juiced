@@ -1,5 +1,8 @@
 package dev.juiced.modules.tweaks;
 
+import org.jspecify.annotations.Nullable;
+
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.Slot;
@@ -51,6 +54,12 @@ public final class InventoryAnimations extends Module {
 
 	private static boolean active() {
 		return INSTANCE != null && INSTANCE.isEnabled();
+	}
+
+	/** Its hooks only run inside inventory screens, and the menu isn't one. */
+	@Override
+	public @Nullable String probeLiveReason(Minecraft minecraft) {
+		return "Nur im Inventar";
 	}
 
 	/** Before a slot is drawn: grow and wiggle the hovered one. Coordinates are relative to the container. */

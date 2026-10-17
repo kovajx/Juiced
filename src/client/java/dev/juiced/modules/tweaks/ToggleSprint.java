@@ -1,5 +1,7 @@
 package dev.juiced.modules.tweaks;
 
+import org.jspecify.annotations.Nullable;
+
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Options;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -58,6 +60,12 @@ public final class ToggleSprint extends HudModule {
 			Minecraft.getInstance().options.keySprint.setDown(false);
 			forced = false;
 		}
+	}
+
+	/** The sprinting itself needs you walking; the menu shows the indicator, if there is one. */
+	@Override
+	public @Nullable String probeLiveReason(Minecraft minecraft) {
+		return indicator.on() ? null : "Wirkt beim Laufen";
 	}
 
 	@Override

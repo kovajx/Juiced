@@ -6,7 +6,9 @@ import java.util.List;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.renderpearl.api.textures.GpuTexture;
 import org.joml.Vector4f;
+import org.jspecify.annotations.Nullable;
 
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 
 import dev.juiced.JuicedClient;
@@ -34,6 +36,12 @@ public final class Fullbright extends Module {
 
 	public static boolean active() {
 		return INSTANCE != null && INSTANCE.isEnabled() && !broken && !INSTANCE.servers.blockedHere();
+	}
+
+	/** It lights everything at once, so it is always live; best seen at night or in a cave. */
+	@Override
+	public @Nullable String probeLiveReason(Minecraft minecraft) {
+		return broken ? "Hier nicht verfügbar" : null;
 	}
 
 	/**

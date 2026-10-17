@@ -1,9 +1,12 @@
 package dev.juiced.modules.tweaks;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import org.jspecify.annotations.Nullable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.player.LocalPlayer;
 
 import dev.juiced.core.Category;
 import dev.juiced.core.Colors;
@@ -26,6 +29,13 @@ public final class LowFire extends Module {
 		super("low_fire", "Low Fire", Category.TWEAKS, true,
 				"Das Feuer auf deinem Bildschirm sitzt tiefer, ist kleiner oder ganz weg, damit du beim Brennen weiter alles siehst.");
 		INSTANCE = this;
+	}
+
+	/** The menu never sets you on fire for a demo; that would be real game state the server fights over. */
+	@Override
+	public @Nullable String probeLiveReason(Minecraft minecraft) {
+		LocalPlayer player = minecraft.player;
+		return player != null && player.isOnFire() ? null : "Nur wenn du brennst";
 	}
 
 	/** Called at the start of the fire overlay. Either cancels it or moves it down. */

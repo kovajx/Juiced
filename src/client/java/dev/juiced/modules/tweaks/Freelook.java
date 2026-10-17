@@ -3,9 +3,16 @@ package dev.juiced.modules.tweaks;
 import java.util.List;
 import java.util.Locale;
 
+import org.jspecify.annotations.Nullable;
+
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.world.level.ClipContext;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec3;
 
 import dev.juiced.JuicedClient;
 import dev.juiced.core.Category;
@@ -96,6 +103,54 @@ public final class Freelook extends Module {
 		toggled = false;
 		noticeUntil = 0;
 		FreeCamera.stop(FreeCamera.Owner.FREELOOK, false);
+	}
+
+	/**
+	 * The menu shows Freelook with its own camera behind you (its close rear shot: body yaw - 35, pitch 12,
+	 * 3.2 blocks); Freelook itself never starts while a screen is open or another camera is active.
+	 */
+	@Override
+	public @Nullable String probeLiveReason(Minecraft minecraft) {
+		LocalPlayer player = minecraft.player;
+
+		if (player == null || !cameraFits(minecraft, player.yBodyRot - 35f, 12f, 3.2f)) {
+			return "Hier kein Platz hinter dir";
+		}
+
+		return null;
+	}
+
+	/**
+	 * True if a third-person camera turned to (yaw, pitch) has room at {@code distance} from your eyes: nothing
+	 * closer than 1.5 blocks on the way back, the same rule the menu camera uses for its shots.
+	 */
+	static boolean cameraFits(Minecraft minecraft, float yaw, float pitch, float distance) {
+		LocalPlayer player = minecraft.player;
+		ClientLevel level = minecraft.level;
+
+		if (player == null || level == null) {
+			return false;
+		}
+
+		Vec3 eye = player.getEyePosition();
+		double yawRad = Math.toRadians(yaw);
+		double pitchRad = Math.toRadians(pitch);
+		// The camera sits behind the eyes, against the way it looks
+		double dx = Math.sin(yawRad) * Math.cos(pitchRad) * distance;
+		double dy = Math.sin(pitchRad) * distance;
+		double dz = -Math.cos(yawRad) * Math.cos(pitchRad) * distance;
+		Vec3 end = new Vec3(eye.x + dx, eye.y + dy, eye.z + dz);
+		BlockHitResult hit = level.clip(new ClipContext(eye, end, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, player));
+
+		if (hit == null || hit.getType() == HitResult.Type.MISS) {
+			return true;
+		}
+
+		Vec3 at = hit.getLocation();
+		double hx = at.x - eye.x;
+		double hy = at.y - eye.y;
+		double hz = at.z - eye.z;
+		return hx * hx + hy * hy + hz * hz >= 1.5 * 1.5;
 	}
 
 	/** Called from MouseHandlerMixin. Returns true if the scroll changed the freelook distance. */

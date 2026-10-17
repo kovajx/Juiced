@@ -1,5 +1,6 @@
 package dev.juiced.modules.tweaks;
 
+import org.jspecify.annotations.Nullable;
 import org.spongepowered.asm.mixin.injection.invoke.arg.Args;
 
 import net.minecraft.client.Minecraft;
@@ -54,6 +55,12 @@ public final class SmoothHotbar extends Module {
 
 	private static boolean active() {
 		return INSTANCE != null && INSTANCE.isEnabled();
+	}
+
+	/** The menu hides the hotbar, and changing your slot for a demo would tell the server too. */
+	@Override
+	public @Nullable String probeLiveReason(Minecraft minecraft) {
+		return "Wirkt beim Slot-Wechsel";
 	}
 
 	/** Called for every sprite the hotbar draws; moves the selection frame. */

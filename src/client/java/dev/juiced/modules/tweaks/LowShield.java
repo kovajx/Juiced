@@ -1,6 +1,10 @@
 package dev.juiced.modules.tweaks;
 
+import org.jspecify.annotations.Nullable;
+
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 
@@ -32,11 +36,22 @@ public final class LowShield extends Module {
 			return 0f;
 		}
 
-		if (stack.is(Items.SHIELD) || (module.totem.on() && stack.is(Items.TOTEM_OF_UNDYING))) {
-			return module.height.f();
+		return module.lowers(stack) ? module.height.f() : 0f;
+	}
+
+	private boolean lowers(ItemStack stack) {
+		return stack.is(Items.SHIELD) || (totem.on() && stack.is(Items.TOTEM_OF_UNDYING));
+	}
+
+	@Override
+	public @Nullable String probeLiveReason(Minecraft minecraft) {
+		LocalPlayer player = minecraft.player;
+
+		if (player != null && !player.isSpectator() && (lowers(player.getMainHandItem()) || lowers(player.getOffhandItem()))) {
+			return null;
 		}
 
-		return 0f;
+		return "Nur mit Schild in der Hand";
 	}
 
 	@Override

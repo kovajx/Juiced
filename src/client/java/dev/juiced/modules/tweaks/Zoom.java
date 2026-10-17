@@ -7,6 +7,7 @@ import dev.juiced.JuicedClient;
 import dev.juiced.core.Category;
 import dev.juiced.core.Clock;
 import dev.juiced.core.Colors;
+import dev.juiced.core.MenuState;
 import dev.juiced.core.Module;
 import dev.juiced.core.Theme;
 import dev.juiced.core.setting.BoolSetting;
@@ -22,10 +23,18 @@ public final class Zoom extends Module {
 	private final BoolSetting scroll = add(new BoolSetting("scroll", "Mausrad zum Zoomen", true));
 	private final BoolSetting cinematic = add(new BoolSetting("cinematic", "Filmische Kamera beim Zoomen", false));
 
+	/** A gap in the menu's probe ticks longer than this means the menu stopped showing Zoom. */
+	private static final double PROBE_GRACE = 0.25;
+	/** One demo zoom in the menu: rest, zoom in, hold, zoom out, rest (seconds). */
+	private static final float PULSE_SECONDS = 3f;
+
 	private float current = 1f;
 	private float extra = 1f;
 	private boolean wasZooming;
 	private boolean previousSmoothCamera;
+	// The Weltprobe menu's demo zoom; it never touches the key state, tick or the camera options
+	private double probeSeen = -10;
+	private double probeStart;
 
 	public Zoom() {
 		super("zoom", "Zoom", Category.TWEAKS, true,
@@ -63,7 +72,53 @@ public final class Zoom extends Module {
 		}
 
 		wasZooming = false;
-		current = 1f;
+		// Zapping away from the menu's demo zoom eases back out instead of jumping
+		boolean demo = Clock.t() - probeSeen <= PROBE_GRACE;
+		probeSeen = -10;
+
+		if (!demo) {
+			current = 1f;
+		}
+	}
+
+	/**
+	 * The menu can't hold the zoom key for you (and zooming() is off while any screen is open), so while it shows
+	 * Zoom it pulses the zoom by itself, through the same smoothing as the key.
+	 */
+	@Override
+	public void probeTick(Minecraft minecraft, int ticks) {
+		double now = Clock.t();
+
+		if (now - probeSeen > PROBE_GRACE) {
+			probeStart = now;
+		}
+
+		probeSeen = now;
+	}
+
+	/** How far the menu's demo zoom is in right now, 0..1; 0 as soon as the menu stops showing Zoom or closes. */
+	private float probePulse() {
+		double now = Clock.t();
+
+		if (!MenuState.hidesHud() || now - probeSeen > PROBE_GRACE) {
+			return 0f;
+		}
+
+		float t = (float) ((now - probeStart) % PULSE_SECONDS);
+		float pulse;
+
+		if (t < 0.5f) {
+			pulse = 0f;
+		} else if (t < 1.1f) {
+			pulse = Clock.easeInOut((t - 0.5f) / 0.6f);
+		} else if (t < 2.1f) {
+			pulse = 1f;
+		} else {
+			pulse = 1f - Clock.easeInOut((t - 2.1f) / 0.6f);
+		}
+
+		// Without "Weicher Übergang" the key snaps in and out, and so does the demo
+		return smooth.on() ? pulse : pulse >= 0.5f ? 1f : 0f;
 	}
 
 	/** Called from CameraMixin: multiplier for the field of view (1 = no zoom). */
@@ -74,7 +129,7 @@ public final class Zoom extends Module {
 			return 1f;
 		}
 
-		float target = module.zooming() ? module.strength.f() * module.extra : 1f;
+		float target = module.zooming() ? module.strength.f() * module.extra : 1f + (module.strength.f() - 1f) * module.probePulse();
 
 		if (module.smooth.on()) {
 			module.current = Clock.approach(module.current, target, 14f);

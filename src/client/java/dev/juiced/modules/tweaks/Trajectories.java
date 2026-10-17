@@ -2,6 +2,8 @@ package dev.juiced.modules.tweaks;
 
 import java.util.List;
 
+import org.jspecify.annotations.Nullable;
+
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -19,6 +21,7 @@ import net.minecraft.world.phys.Vec3;
 import dev.juiced.core.Category;
 import dev.juiced.core.Clock;
 import dev.juiced.core.Colors;
+import dev.juiced.core.MenuState;
 import dev.juiced.core.Module;
 import dev.juiced.core.ServerBlockList;
 import dev.juiced.core.Theme;
@@ -33,6 +36,11 @@ import dev.juiced.render.Gui2D;
  */
 public final class Trajectories extends Module {
 	private static final int MAX_STEPS = 120;
+	/** A gap in the menu's probe ticks longer than this means the menu stopped showing the arc. */
+	private static final double PROBE_GRACE = 0.25;
+	/** A pearl, snowball or egg: what the menu's demo arc flies like when nothing fitting is in your hands. */
+	private static final Motion THROWN = new Motion(1.5f, 0, 0.03, 0.99, false);
+	private static final Motion FULL_BOW = new Motion(3f, 0, 0.05, 0.99, true);
 
 	private final ColorSetting color = add(new ColorSetting("color", "Farbe"));
 	private final BoolSetting pearls = add(new BoolSetting("pearls", "Enderperlen", true));
@@ -45,6 +53,7 @@ public final class Trajectories extends Module {
 	private final float[] pz = new float[MAX_STEPS + 1];
 	private final float[] hw = new float[MAX_STEPS + 1];
 	private final int[] colors = new int[MAX_STEPS + 1];
+	private double probeSeen = -10;
 
 	public Trajectories() {
 		super("trajectories", "Flugbahn", Category.TWEAKS, true,
@@ -105,6 +114,30 @@ public final class Trajectories extends Module {
 		return null;
 	}
 
+	/** While the menu shows the arc, it flies from your view even with empty hands. */
+	@Override
+	public void probeTick(Minecraft minecraft, int ticks) {
+		probeSeen = Clock.t();
+	}
+
+	/** The demo arc for the menu: a pearl or snowball, or a fully drawn bow if only bows are switched on. */
+	private @Nullable Motion probeMotion() {
+		if (!MenuState.hidesHud() || Clock.t() - probeSeen > PROBE_GRACE) {
+			return null;
+		}
+
+		if (pearls.on() || others.on()) {
+			return THROWN;
+		}
+
+		return bows.on() ? FULL_BOW : null;
+	}
+
+	@Override
+	public @Nullable String probeLiveReason(Minecraft minecraft) {
+		return pearls.on() || bows.on() || others.on() ? null : "Alle Arten ausgeschaltet";
+	}
+
 	@Override
 	public void renderWorld(Geo geo) {
 		Minecraft minecraft = Minecraft.getInstance();
@@ -119,6 +152,10 @@ public final class Trajectories extends Module {
 
 		if (motion == null) {
 			motion = motionFor(player, player.getOffhandItem());
+		}
+
+		if (motion == null) {
+			motion = probeMotion();
 		}
 
 		if (motion == null) {

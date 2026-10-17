@@ -15,6 +15,7 @@ import dev.juiced.core.Category;
 import dev.juiced.core.Clock;
 import dev.juiced.core.Colors;
 import dev.juiced.core.Hud;
+import dev.juiced.core.MenuState;
 import dev.juiced.core.Module;
 import dev.juiced.core.Previews;
 import dev.juiced.core.Theme;
@@ -56,6 +57,10 @@ public final class HitDirection extends Module {
 	// Card preview: hits from the left, from behind and from the right (sword, arrow, fireball)
 	private static final float[] PREVIEW_ANGLES = {-1.75f, 3.0f, 1.4f};
 	private static final int[] PREVIEW_COLORS = {MELEE, PROJECTILE, FIRE};
+	/** Menu try-out: one made-up hit of each kind in turn. */
+	private static final int[] PROBE_COLORS = {MELEE, PROJECTILE, FIRE, EXPLOSION};
+	/** A gap in the menu's probe ticks longer than this means the menu stopped showing the arcs. */
+	private static final double PROBE_GRACE = 0.25;
 
 	private final SliderSetting size = add(SliderSetting.percent("size", "Größe", 0.5, 2.0, 1.0));
 	private final SliderSetting duration = add(new SliderSetting("duration", "Dauer", 0.6, 2.5, 0.1, 1.2, v -> String.format("%.1fs", v)));
@@ -69,6 +74,8 @@ public final class HitDirection extends Module {
 	private final int[] seed = new int[MAX];
 	private final boolean[] circle = new boolean[MAX];
 	private final boolean[] alive = new boolean[MAX];
+	/** Made up by the menu; such an arc must never reach the real HUD after the menu closes. */
+	private final boolean[] fake = new boolean[MAX];
 
 	private boolean primed;
 	private int lastHurtTime;
@@ -77,6 +84,9 @@ public final class HitDirection extends Module {
 	private long lastHitTick = -100;
 	private int newest = -1;
 	private int seedCounter;
+	private double probeSeen = -10;
+	private int probeAt;
+	private int probeHits;
 
 	public HitDirection() {
 		super("hit_direction", "Treffer-Richtung", Category.TWEAKS, true,
@@ -142,6 +152,7 @@ public final class HitDirection extends Module {
 		}
 
 		alive[newest] = true;
+		fake[newest] = false;
 		circle[newest] = !directed;
 		rgb[newest] = colorOf(source);
 		// hurtDir is the hit's direction minus your yaw, with 90 meaning straight ahead
@@ -163,6 +174,68 @@ public final class HitDirection extends Module {
 		}
 
 		return slot;
+	}
+
+	/**
+	 * The menu can't hurt you, so while it shows Treffer-Richtung it makes up a hit every 1.6 s (longer if the arcs
+	 * last longer), from a direction that turns round you and in the colours of sword, arrow, fire and explosion.
+	 */
+	@Override
+	public void probeTick(Minecraft minecraft, int ticks) {
+		LocalPlayer player = minecraft.player;
+		probeSeen = Clock.t();
+
+		if (player == null) {
+			return;
+		}
+
+		if (ticks < probeAt) {
+			// Tuned in again: start over with the first kind
+			probeAt = 0;
+			probeHits = 0;
+		}
+
+		int every = Math.max(32, Math.round((duration.f() + 0.3f) * 20f));
+
+		// The first one waits a moment for the camera to arrive in your view
+		if (ticks >= 10 && (probeHits == 0 || ticks - probeAt >= every)) {
+			probeAt = ticks;
+			previewHit(minecraft, player, probeHits++);
+		}
+	}
+
+	private void previewHit(Minecraft minecraft, LocalPlayer player, int n) {
+		int slot = freeSlot();
+
+		if (slot == newest) {
+			newest = -1;
+		}
+
+		alive[slot] = true;
+		fake[slot] = true;
+		start[slot] = Clock.t();
+		seed[slot] = ++seedCounter * 0x9E3779B1;
+		rgb[slot] = PROBE_COLORS[n % PROBE_COLORS.length];
+		// Every 4th (the explosion) shows the circle for hits without a direction, if that is switched on
+		circle[slot] = undirected.on() && n % 4 == 3;
+		// Steps of the golden angle, so the side keeps changing and doesn't repeat soon
+		yaw[slot] = viewYaw(minecraft, player, 1f) - 100f + n * 137.5f;
+	}
+
+	/** True while the menu shows this module; ends at once when the menu closes and gives the HUD back. */
+	private boolean probeShown() {
+		return MenuState.hidesHud() && Clock.t() - probeSeen <= PROBE_GRACE;
+	}
+
+	/** The yaw the camera looks along (Freelook, the menu camera and front view turn it away from the player's). */
+	private static float viewYaw(Minecraft minecraft, LocalPlayer player, float partialTick) {
+		float viewYaw = FreeCamera.cameraYaw(player.getYRot(partialTick));
+
+		if (minecraft.options.getCameraType() == CameraType.THIRD_PERSON_FRONT) {
+			viewYaw += 180f;
+		}
+
+		return viewYaw;
 	}
 
 	private static int colorOf(@Nullable DamageSource source) {
@@ -196,17 +269,23 @@ public final class HitDirection extends Module {
 		double now = Clock.t();
 		float life = duration.f();
 		// Relative to the camera, so the arc stays right while looking around with Freelook or in front view
-		float viewYaw = FreeCamera.cameraYaw(player.getYRot(hud.partialTick));
-
-		if (hud.minecraft.options.getCameraType() == CameraType.THIRD_PERSON_FRONT) {
-			viewYaw += 180f;
-		}
-
+		float viewYaw = viewYaw(hud.minecraft, player, hud.partialTick);
 		float cx = hud.centerX() + 0.5f;
 		float cy = hud.centerY() + 0.5f;
+		boolean menu = probeShown();
+
+		if (menu) {
+			// The menu hides the crosshair, and the arcs only make sense around it
+			crosshair(g, hud.centerX(), hud.centerY(), 0x99FFFFFF);
+		}
 
 		for (int i = 0; i < MAX; i++) {
 			if (!alive[i]) {
+				continue;
+			}
+
+			if (fake[i] && !menu) {
+				alive[i] = false;
 				continue;
 			}
 
@@ -356,15 +435,19 @@ public final class HitDirection extends Module {
 		Arrays.fill(alive, false);
 		primed = false;
 		newest = -1;
+		probeSeen = -10;
+	}
+
+	private static void crosshair(GuiGraphicsExtractor g, int cx, int cy, int color) {
+		Gui2D.fill(g, cx - 4, cy, cx + 5, cy + 1, color);
+		Gui2D.fill(g, cx, cy - 4, cx + 1, cy + 5, color);
 	}
 
 	@Override
 	public void drawPreview(GuiGraphicsExtractor g, int x, int y, int w, int h, float time) {
 		float cx = x + w / 2f;
 		float cy = y + h / 2f;
-		int cross = 0xCCFFFFFF;
-		Gui2D.fill(g, Math.round(cx) - 4, Math.round(cy), Math.round(cx) + 5, Math.round(cy) + 1, cross);
-		Gui2D.fill(g, Math.round(cx), Math.round(cy) - 4, Math.round(cx) + 1, Math.round(cy) + 5, cross);
+		crosshair(g, Math.round(cx), Math.round(cy), 0xCCFFFFFF);
 
 		float period = 1.5f;
 		int index = (int) (time / period);

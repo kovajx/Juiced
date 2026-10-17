@@ -1,5 +1,8 @@
 package dev.juiced.modules.system;
 
+import org.jspecify.annotations.Nullable;
+
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 
 import dev.juiced.core.Category;
@@ -37,6 +40,12 @@ public final class ThemeModule extends Module {
 	@Override
 	public boolean alwaysOn() {
 		return true;
+	}
+
+	/** Nothing of its own in the world: the menu around it changes colour, and the card shows the gradient. */
+	@Override
+	public @Nullable String probeLiveReason(Minecraft minecraft) {
+		return "Färbt Menü und Effekte";
 	}
 
 	@Override

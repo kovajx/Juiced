@@ -19,6 +19,7 @@ import dev.juiced.render.Gui2D;
 public final class TargetHud extends HudModule {
 	private static final EquipmentSlot[] SLOTS = {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET, EquipmentSlot.MAINHAND};
 	private static final int WIDTH = 154;
+	private static final float[] SAMPLE_HEALTH = {18f, 14.5f, 11f, 7.5f};
 
 	private final BoolSetting armor = add(new BoolSetting("armor", "Rüstung zeigen", true));
 	private final BoolSetting advantage = add(new BoolSetting("advantage", "Vorteil-Anzeige", true));
@@ -71,16 +72,16 @@ public final class TargetHud extends HudModule {
 		}
 
 		if (sample) {
+			// A made-up fight: the opponent takes a hit every 1.5 s, so the trailing bar and the lead show too
 			name = "Gegner";
-			hp = 13f;
+			hp = SAMPLE_HEALTH[(int) (Clock.t() / 1.5) % SAMPLE_HEALTH.length];
 			maxHp = 20f;
 			absorption = 4f;
 			distance = "3.1m";
 			pops = 2;
-			lead = 2.5f;
+			lead = self == null ? 0f : (self.getHealth() + self.getAbsorptionAmount()) - (hp + absorption);
 			alpha = 1f;
-			health = hp;
-			ghost = 16f;
+			animateHealth();
 		} else {
 			name = shown.getName().getString();
 			hp = Math.max(0f, shown.getHealth());
