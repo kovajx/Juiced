@@ -19,7 +19,8 @@ import dev.juiced.render.Gui2D;
 
 /**
  * Draws a list of settings (toggles, sliders, choices, colors, buttons) and makes them clickable.
- * Used on the back of the menu cards and in the wardrobe.
+ * Used on the back of the menu cards, in the Weltprobe drawer (which also steers it by keyboard through
+ * {@link #focus}) and in the wardrobe.
  *
  * <p>Drawing happens in the caller's local coordinates; {@link #originX}/{@link #originY} say where
  * local (0, 0) is on screen, so click areas end up in the right place.
@@ -30,6 +31,10 @@ public final class SettingsList {
 	static final int TRACK = 0xFF33333F;
 	static final int DOT = 9;
 	static final int DOT_GAP = 3;
+	/** Background of a bundle part's switch row. */
+	static final int HEADER = 0xFF1A1A22;
+	/** Id start of the part switches {@link dev.juiced.core.ModuleGroup} adds to a bundle. */
+	static final String PART_PREFIX = "part_";
 
 	@FunctionalInterface
 	public interface Sink {
@@ -71,17 +76,101 @@ public final class SettingsList {
 
 	/** Moves the keyboard focus by {@code delta} visible rows (Up/Down in the Weltprobe drawer), clamped; -1 to 0 starts it. */
 	public void moveFocus(List<Setting<?>> settings, int delta) {
-		// TODO(gui-support)
+		int count = 0;
+
+		for (Setting<?> setting : settings) {
+			if (setting.visible()) {
+				count++;
+			}
+		}
+
+		if (count == 0) {
+			focus = -1;
+		} else if (focus < 0) {
+			focus = 0;
+		} else {
+			focus = Math.max(0, Math.min(count - 1, focus + delta));
+		}
 	}
 
 	/** Changes the focused row with Left/Right ({@code direction} -1 or +1): toggles, steps sliders, cycles choices and colours, presses buttons. */
 	public void changeFocused(List<Setting<?>> settings, int direction) {
-		// TODO(gui-support)
+		Setting<?> setting = focused(settings);
+		int dir = Integer.signum(direction);
+
+		if (setting == null || dir == 0) {
+			return;
+		}
+
+		if (setting instanceof BoolSetting bool) {
+			toggle(bool);
+		} else if (setting instanceof SliderSetting slider) {
+			// One step per press; setFraction snaps to the step grid just like dragging does
+			if (slider.max > slider.min) {
+				slider.setFraction(slider.fraction() + dir * slider.step / (slider.max - slider.min));
+			}
+		} else if (setting instanceof ChoiceSetting choice) {
+			step(choice, dir);
+		} else if (setting instanceof ColorSetting color) {
+			// Walks the swatches; the "+" (free color) needs the picker, so keys skip it
+			int[] options = colorOptions(color);
+			int current = -1;
+
+			for (int i = 0; i < options.length; i++) {
+				if (options[i] == color.get()) {
+					current = i;
+					break;
+				}
+			}
+
+			int next = current < 0 ? (dir > 0 ? 0 : options.length - 1) : Math.floorMod(current + dir, options.length);
+			pick(color, options[next]);
+		} else if (setting instanceof ButtonSetting button) {
+			press(button);
+		}
 	}
 
 	/** Top and bottom (content y, before scrolling) of the focused row, so the caller can scroll it into view; null if none. */
 	public int[] focusedRowSpan(List<Setting<?>> settings, int width) {
-		return null; // TODO(gui-support)
+		if (focus < 0) {
+			return null;
+		}
+
+		int y = 0;
+		int index = 0;
+
+		for (Setting<?> setting : settings) {
+			if (!setting.visible()) {
+				continue;
+			}
+
+			int rowH = rowHeight(setting, width);
+
+			if (index == focus) {
+				return new int[] {y, y + rowH};
+			}
+
+			y += rowH;
+			index++;
+		}
+
+		return null;
+	}
+
+	private Setting<?> focused(List<Setting<?>> settings) {
+		if (focus < 0) {
+			return null;
+		}
+
+		int index = 0;
+
+		for (Setting<?> setting : settings) {
+			if (setting.visible() && index++ == focus) {
+				return setting;
+			}
+		}
+
+		return null;
 	}
 
 	/**
@@ -91,6 +180,7 @@ public final class SettingsList {
 	public int draw(GuiGraphicsExtractor g, List<Setting<?>> settings, int left, int width, int top, int bottom, int scroll, boolean interactive) {
 		int y = top - scroll;
 		int height = 0;
+		int index = 0;
 
 		for (Setting<?> setting : settings) {
 			if (!setting.visible()) {
@@ -101,10 +191,21 @@ public final class SettingsList {
 
 			if (y >= top - 1 && y + rowH <= bottom + 1) {
 				drawSetting(g, setting, left, left + width, y, interactive);
+
+				if (index == focus) {
+					// 4 px out so it clears the slider knob at 100%
+					Gui2D.outline(g, left - 4, y, left + width + 4, y + rowH, Colors.argb(1f, Theme.accent()));
+				}
 			}
 
 			y += rowH;
 			height += rowH;
+			index++;
+		}
+
+		// Rows can vanish under the focus (a part switched off by mouse): keep it on the last row
+		if (focus >= index) {
+			focus = index - 1;
 		}
 
 		return height;
@@ -158,6 +259,11 @@ public final class SettingsList {
 		int accent = Theme.accent();
 
 		if (setting instanceof BoolSetting bool) {
+			if (setting.id.startsWith(PART_PREFIX)) {
+				// A bundle part's switch heads the settings of that part
+				Gui2D.rounded(g, left - 3, y + 1, right + 3, y + 17, HEADER);
+			}
+
 			Gui2D.text(g, setting.label, left, y + 5, TEXT, false, 0.8f);
 			int sw = 20;
 			int sx = right - sw;
@@ -167,10 +273,7 @@ public final class SettingsList {
 			Gui2D.rounded(g, knob, sy + 2, knob + 7, sy + 9, 0xFFFFFFFF);
 
 			if (interactive) {
-				hit(left - 3, y, right + 3, y + 17, () -> {
-					bool.toggle();
-					Fx.sound("ui.button.click", 0.25f, bool.on() ? 1.4f : 0.9f);
-				});
+				hit(left - 3, y, right + 3, y + 17, () -> toggle(bool));
 			}
 		} else if (setting instanceof SliderSetting slider) {
 			String value = slider.display();
@@ -205,14 +308,8 @@ public final class SettingsList {
 			Gui2D.text(g, "›", right - 8, boxY + 2, hoverRight ? Colors.argb(1f, accent) : DIM, false, 1f);
 
 			if (interactive) {
-				hit(left, boxY, mid, boxY + 12, () -> {
-					choice.previous();
-					Fx.sound("ui.button.click", 0.2f, 1.1f);
-				});
-				hit(mid, boxY, right, boxY + 12, () -> {
-					choice.next();
-					Fx.sound("ui.button.click", 0.2f, 1.2f);
-				});
+				hit(left, boxY, mid, boxY + 12, () -> step(choice, -1));
+				hit(mid, boxY, right, boxY + 12, () -> step(choice, 1));
 			}
 		} else if (setting instanceof ColorSetting color) {
 			Gui2D.text(g, setting.label, left, y + 3, TEXT, false, 0.8f);
@@ -253,10 +350,7 @@ public final class SettingsList {
 				}
 
 				if (interactive) {
-					hit(dx - 1, dy - 1, dx + DOT + 1, dy + DOT + 1, () -> {
-						color.set(option);
-						Fx.sound("ui.button.click", 0.2f, 1.3f);
-					});
+					hit(dx - 1, dy - 1, dx + DOT + 1, dy + DOT + 1, () -> pick(color, option));
 				}
 			}
 		} else if (setting instanceof ButtonSetting button) {
@@ -268,12 +362,36 @@ public final class SettingsList {
 			Gui2D.centered(g, label, right - bw / 2f, y + 6, hovered ? 0xFF0B0B10 : TEXT, false, 0.75f);
 
 			if (interactive) {
-				hit(right - bw, y + 3, right, y + 16, () -> {
-					button.press();
-					Fx.sound("ui.button.click", 0.25f, 1.2f);
-				});
+				hit(right - bw, y + 3, right, y + 16, () -> press(button));
 			}
 		}
+	}
+
+	// Shared by clicks and keys, so both sound the same
+
+	private static void toggle(BoolSetting bool) {
+		bool.toggle();
+		Fx.sound("ui.button.click", 0.25f, bool.on() ? 1.4f : 0.9f);
+	}
+
+	private static void step(ChoiceSetting choice, int direction) {
+		if (direction < 0) {
+			choice.previous();
+			Fx.sound("ui.button.click", 0.2f, 1.1f);
+		} else {
+			choice.next();
+			Fx.sound("ui.button.click", 0.2f, 1.2f);
+		}
+	}
+
+	private static void pick(ColorSetting color, int option) {
+		color.set(option);
+		Fx.sound("ui.button.click", 0.2f, 1.3f);
+	}
+
+	private static void press(ButtonSetting button) {
+		button.press();
+		Fx.sound("ui.button.click", 0.25f, 1.2f);
 	}
 
 	static void drawSwatch(GuiGraphicsExtractor g, int x, int y, int option) {

@@ -29,7 +29,6 @@ import dev.juiced.render.Gui2D;
  * (hold Shift to move freely). Scroll over an element to resize it, right-click to reset it.
  */
 public class HudEditorScreen extends Screen {
-	private static final int SNAP = 4;
 	private static final int GRID = 10;
 	private static final int TEXT = 0xFFEDEDF2;
 	private static final int DIM = 0xFF8A8A99;
@@ -47,6 +46,8 @@ public class HudEditorScreen extends Screen {
 	}
 
 	private final Screen parent;
+	/** Shown and editable even while switched off, because the editor was opened for it. */
+	private final @Nullable HudModule preselect;
 	private final List<Box> boxes = new ArrayList<>();
 	private final List<Button> buttons = new ArrayList<>();
 	private final double openedAt = Clock.t();
@@ -64,13 +65,14 @@ public class HudEditorScreen extends Screen {
 
 	/** Opens the editor with {@code preselect} selected, shown even while it is switched off (from the Weltprobe menu). */
 	public HudEditorScreen(Screen parent, @Nullable HudModule preselect) {
-		this(parent);
-		// TODO(gui-support): select preselect and show it even when off
+		super(Component.literal("HUD bearbeiten"));
+		this.parent = parent;
+		this.preselect = preselect;
+		this.selected = preselect;
 	}
 
 	public HudEditorScreen(Screen parent) {
-		super(Component.literal("HUD bearbeiten"));
-		this.parent = parent;
+		this(parent, null);
 	}
 
 	private static List<HudModule> hudModules() {
@@ -120,7 +122,7 @@ public class HudEditorScreen extends Screen {
 		Box hovered = null;
 
 		for (HudModule module : hudModules()) {
-			if (!module.isEnabled() || !module.renderForEditor(g, hud)) {
+			if ((!module.isEnabled() && module != preselect) || !module.renderForEditor(g, hud)) {
 				continue;
 			}
 
@@ -143,8 +145,11 @@ public class HudEditorScreen extends Screen {
 
 			Gui2D.outline(g, box.x - 1, box.y - 1, box.x + box.w + 1, box.y + box.h + 1, color);
 
-			if (isSelected || isHovered) {
-				String label = box.module.name + "  " + Math.round(box.module.scale * 100) + "%";
+			// The preselected element can be shown while switched off: keep that visible on it
+			boolean off = !box.module.isSwitchedOn();
+
+			if (isSelected || isHovered || off) {
+				String label = box.module.name + "  " + Math.round(box.module.scale * 100) + "%" + (off ? "  · aus" : "");
 				int lw = Gui2D.width(label, 0.75f) + 8;
 				int ly = box.y - 12 >= 0 ? box.y - 12 : box.y + box.h + 2;
 				Gui2D.rounded(g, box.x - 1, ly, box.x - 1 + lw, ly + 10, Colors.argb(0.92f, isSelected ? accent : 0x1A1A24));
@@ -278,8 +283,16 @@ public class HudEditorScreen extends Screen {
 		guideY = null;
 
 		if (!this.minecraft.hasShiftDown()) {
-			float[] snappedX = snap(x, w, true);
-			float[] snappedY = snap(y, h, false);
+			List<int[]> others = new ArrayList<>();
+
+			for (Box box : boxes) {
+				if (box.module != dragging) {
+					others.add(new int[] {box.x, box.y, box.w, box.h});
+				}
+			}
+
+			float[] snappedX = snap(x, w, true, others);
+			float[] snappedY = snap(y, h, false, others);
 			x = snappedX[0];
 			y = snappedY[0];
 
@@ -292,59 +305,24 @@ public class HudEditorScreen extends Screen {
 			}
 		}
 
-		x = Math.max(HudModule.PAD, Math.min(this.width - HudModule.PAD - w, x));
-		y = Math.max(HudModule.PAD, Math.min(this.height - HudModule.PAD - h, y));
+		x = HudSnap.clamp(x, w, this.width);
+		y = HudSnap.clamp(y, h, this.height);
 		module.moveTo(x, y, this.width, this.height);
 	}
 
 	/**
-	 * Snaps one axis. Returns {new position, guide line or -1}.
-	 * Lines: screen edges (with padding), screen middle, and the edges/middles of other elements.
+	 * Snaps one axis with {@link HudSnap#snapAxis}; with the grid on, a position that snaps to no line rounds to
+	 * the grid instead. Returns {new position, guide line or -1}. Positions stay fractional so the element keeps
+	 * the exact spot it was grabbed at.
 	 */
-	private float[] snap(float position, int size, boolean horizontal) {
-		int screen = horizontal ? this.width : this.height;
-		List<Float> lines = new ArrayList<>();
-		lines.add((float) HudModule.PAD);
-		lines.add((float) (screen - HudModule.PAD));
-		lines.add(screen / 2f);
+	private float[] snap(float position, int size, boolean horizontal, List<int[]> others) {
+		float[] snapped = HudSnap.snapAxis(position, size, horizontal ? this.width : this.height, others, horizontal);
 
-		for (Box box : boxes) {
-			if (box.module == dragging) {
-				continue;
-			}
-
-			float start = horizontal ? box.x : box.y;
-			float length = horizontal ? box.w : box.h;
-			lines.add(start);
-			lines.add(start + length);
-			lines.add(start + length / 2f);
-			// Leave a small gap when stacking next to another element
-			lines.add(start - 2);
-			lines.add(start + length + 2);
+		if (snapped[1] < 0 && grid) {
+			snapped[0] = Math.round(position / GRID) * GRID;
 		}
 
-		float[] anchors = {0f, size / 2f, size};
-		float best = SNAP + 1;
-		float result = position;
-		float guide = -1;
-
-		for (float line : lines) {
-			for (float anchor : anchors) {
-				float distance = Math.abs(position + anchor - line);
-
-				if (distance < best) {
-					best = distance;
-					result = line - anchor;
-					guide = line;
-				}
-			}
-		}
-
-		if (guide < 0 && grid) {
-			result = Math.round(position / GRID) * GRID;
-		}
-
-		return new float[] {result, guide};
+		return snapped;
 	}
 
 	// ---- input ----------------------------------------------------------------------------

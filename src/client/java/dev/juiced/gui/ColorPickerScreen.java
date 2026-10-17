@@ -531,6 +531,13 @@ public class ColorPickerScreen extends Screen {
 	}
 
 	@Override
+	public boolean isPauseScreen() {
+		// Pause only if the screen below does: over the wardrobe and the Weltprobe menu the live preview behind
+		// the panel has to keep moving
+		return parent.isPauseScreen();
+	}
+
+	@Override
 	public void onClose() {
 		cancel();
 	}
