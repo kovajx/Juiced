@@ -238,6 +238,12 @@ public final class ProbeController {
 				}
 			}
 
+			// Teleported or respawned in the same world: the dummy follows you
+			if (needsDummy && dummy.placed() && dummy.leftBehind(minecraft.player)) {
+				removeDummy();
+				aimCamera(current, true);
+			}
+
 			// Back from another world, or the ground changed: look for a spot again
 			if (needsDummy && !blocked && !dummy.placed() && !dummy.regrowing()) {
 				placeDummy();

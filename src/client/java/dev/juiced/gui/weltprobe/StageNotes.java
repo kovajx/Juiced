@@ -34,7 +34,8 @@ final class StageNotes {
 
 	/** The first toggle: the coach mark moves on to its second pair of hints. */
 	void toggled() {
-		if (coach == 1) {
+		// Not once the player has searched or opened the drawer: they know their way already
+		if (coach == 1 && coachEndAt > Clock.t()) {
 			coach = 2;
 			coachAt = Clock.t();
 			coachEndAt = coachAt + COACH_TIME;

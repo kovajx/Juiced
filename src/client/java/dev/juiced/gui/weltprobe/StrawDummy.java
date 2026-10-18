@@ -172,6 +172,13 @@ public final class StrawDummy {
 	}
 
 	/** True while the dummy stands in the world (and isn't about to go). */
+	/** True if the dummy's spot is more than a few blocks away from where you are now (a teleport, a respawn). */
+	public boolean leftBehind(Entity player) {
+		double dx = player.getX() - homeX;
+		double dz = player.getZ() - homeZ;
+		return dx * dx + dz * dz > 6 * 6 || Math.abs(player.getY() - homeY) > 3;
+	}
+
 	public boolean placed() {
 		return stand != null && leaving == 0;
 	}

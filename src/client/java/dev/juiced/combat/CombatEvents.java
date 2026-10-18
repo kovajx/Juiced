@@ -61,6 +61,11 @@ public final class CombatEvents {
 	/** Client-only entities the menu puts in the world (the straw dummy): never tracked, so nothing reaches other modules. */
 	private static final Set<Integer> IGNORED = new HashSet<>();
 	private static boolean sprintBeforeProbe;
+	// Your real fight, put back when the menu is done with its dummy
+	private static @Nullable LivingEntity targetBeforeProbe;
+	private static long targetTickBeforeProbe;
+	private static int hitEntityBeforeProbe = -1;
+	private static long hitTickBeforeProbe = -1000;
 	private static boolean probing;
 
 	private CombatEvents() {
@@ -119,6 +124,10 @@ public final class CombatEvents {
 		if (!probing) {
 			probing = true;
 			sprintBeforeProbe = lastHitSprint;
+			targetBeforeProbe = target;
+			targetTickBeforeProbe = targetTick;
+			hitEntityBeforeProbe = lastHitEntity;
+			hitTickBeforeProbe = lastHitTick;
 		}
 
 		int id = dummy.getId();
@@ -130,7 +139,7 @@ public final class CombatEvents {
 		setTarget(dummy);
 	}
 
-	/** The menu is done with its dummy: forget it as target and restore the real last hit. */
+	/** The menu is done with its dummy: forget it as target and put your real target and last hit back. */
 	public static void endProbe(@Nullable LivingEntity dummy) {
 		if (dummy != null) {
 			int id = dummy.getId();
@@ -149,6 +158,18 @@ public final class CombatEvents {
 		if (probing) {
 			probing = false;
 			lastHitSprint = sprintBeforeProbe;
+
+			if (target == null && targetBeforeProbe != null && !targetBeforeProbe.isRemoved() && targetBeforeProbe.isAlive()) {
+				target = targetBeforeProbe;
+				targetTick = targetTickBeforeProbe;
+			}
+
+			if (lastHitEntity == -1) {
+				lastHitEntity = hitEntityBeforeProbe;
+				lastHitTick = hitTickBeforeProbe;
+			}
+
+			targetBeforeProbe = null;
 		}
 	}
 

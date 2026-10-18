@@ -1,6 +1,8 @@
 package dev.juiced.gui.weltprobe;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.jspecify.annotations.Nullable;
 
@@ -72,6 +74,8 @@ public class WeltprobeScreen extends Screen implements CameraKeeper {
 	private double openedAt;
 	/** True while the screen holds the try-out, the camera and the hidden HUD. */
 	private boolean active;
+	/** Keys that are down right now, to tell a fresh press from the system's key repeat. */
+	private final Set<Integer> heldKeys = new HashSet<>();
 	/** A child screen we opened takes over; don't clean up when this screen is removed for it. */
 	private boolean keepCamera;
 	private boolean menuKeyHeld = true;
@@ -100,6 +104,7 @@ public class WeltprobeScreen extends Screen implements CameraKeeper {
 		super.init();
 		// Minecraft only sends typed characters to screens that ask for them
 		this.minecraft.textInputManager().startTextInput(this);
+		heldKeys.clear();
 		layout = new Layout(this.width, this.height);
 
 		if (channels.isEmpty()) {
@@ -158,6 +163,30 @@ public class WeltprobeScreen extends Screen implements CameraKeeper {
 	public void tick() {
 		super.tick();
 		probe.tick();
+	}
+
+	/** The colour picker is on top: keep the try-out running so the colour shows live behind it. */
+	@Override
+	public void tickBehind() {
+		if (active) {
+			probe.tick();
+		}
+	}
+
+	@Override
+	public void drawBehind(GuiGraphicsExtractor g, float partialTick) {
+		if (!active || channels.isEmpty()) {
+			return;
+		}
+
+		Clock.frame();
+		camera.frame();
+		probe.frame(partialTick);
+		Channel channel = channels.get(tuned);
+
+		if (!channel.module.blockedHere()) {
+			hudStage.draw(g, channel, new Hud(this.minecraft, this.width, this.height, partialTick), layout == null ? 16 : layout.margin);
+		}
 	}
 
 	/** Gives back the try-out, the camera and the HUD. Safe to call more than once. */
@@ -442,11 +471,15 @@ public class WeltprobeScreen extends Screen implements CameraKeeper {
 			return;
 		}
 
+		// Leaving the search hits: the search ends, so Enter and Space mean the channel you see
+		search.clear();
 		tune(next, -1, false);
 		Fx.sound("ui.button.click", 0.15f, 1.6f);
 	}
 
 	void jump(int index) {
+		search.clear();
+
 		if (index != tuned || probe.focus() >= 0) {
 			tune(index, -1, true);
 			Fx.sound("ui.button.click", 0.25f, 1.2f);
@@ -506,6 +539,13 @@ public class WeltprobeScreen extends Screen implements CameraKeeper {
 			return;
 		}
 
+		// The card shows the searched entry of a choice card that is off: step on from that one
+		Channel channel = channels.get(tuned);
+
+		if (channel.group() != null && channel.group().isChoice() && !channel.module.isSwitchedOn() && probe.focus() >= 0) {
+			style.set(probe.focus());
+		}
+
 		if (direction > 0) {
 			style.next();
 		} else {
@@ -531,7 +571,11 @@ public class WeltprobeScreen extends Screen implements CameraKeeper {
 			return;
 		}
 
-		search.finish();
+		// Only a toggle that can happen ends the query (blocked and system modules just answer)
+		if (!hit.channel().module.blockedHere() && !hit.channel().module.alwaysOn()) {
+			search.finish();
+		}
+
 		toggles.toggleHit(hit);
 	}
 
@@ -715,8 +759,12 @@ public class WeltprobeScreen extends Screen implements CameraKeeper {
 			return super.keyPressed(event);
 		}
 
+		// The system repeats held keys; only the arrows (and typing) may act on repeats
+		boolean repeat = !heldKeys.add(event.key());
+
 		if (event.hasControlDown()) {
-			int key = event.key();
+			// Layout-aware, so Strg+Z is the key labelled Z on a German keyboard too
+			int key = event.shortcutKey();
 
 			if (key == InputConstants.KEY_Z) {
 				toggles.undo();
@@ -749,7 +797,10 @@ public class WeltprobeScreen extends Screen implements CameraKeeper {
 
 		if (event.isCycleFocus()) {
 			// Tab: the drawer, never the vanilla widget focus
-			toggleDrawer();
+			if (!repeat) {
+				toggleDrawer();
+			}
+
 			return true;
 		}
 
@@ -762,8 +813,9 @@ public class WeltprobeScreen extends Screen implements CameraKeeper {
 				} else {
 					searchEnded();
 				}
-			} else if (previous >= 0) {
-				// TV "last channel": pressing it again goes back and forth between two
+			} else if (previous >= 0 && !repeat) {
+				// TV "last channel": pressing it again goes back and forth between two.
+				// Not on repeats, or holding Backspace to clear a query would flip channels.
 				jump(previous);
 			}
 
@@ -771,6 +823,10 @@ public class WeltprobeScreen extends Screen implements CameraKeeper {
 		}
 
 		if (event.isConfirmation()) {
+			if (repeat) {
+				return true;
+			}
+
 			if (search.active()) {
 				toggleHit();
 			} else {
@@ -782,7 +838,7 @@ public class WeltprobeScreen extends Screen implements CameraKeeper {
 
 		if (event.isSelection()) {
 			// Space: inside a query that is still being typed it is a space (charTyped adds it)
-			if (search.active() && !search.done()) {
+			if (search.active() && !search.done() || repeat) {
 				return true;
 			}
 
@@ -827,6 +883,8 @@ public class WeltprobeScreen extends Screen implements CameraKeeper {
 
 	@Override
 	public boolean keyReleased(KeyEvent event) {
+		heldKeys.remove(event.key());
+
 		if (JuicedClient.MENU_KEY != null && JuicedClient.MENU_KEY.matches(event)) {
 			menuKeyHeld = false;
 		}

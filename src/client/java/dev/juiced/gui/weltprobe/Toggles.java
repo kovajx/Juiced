@@ -219,7 +219,14 @@ final class Toggles {
 		}
 
 		boolean shownOn = last.part() != null ? last.partWas() && on : on;
-		topBar.toast("Rückgängig: " + last.label() + (shownOn ? " an" : " aus"), channel.category().color, false);
+		String label = last.label();
+
+		if (last.kind() != null && on == wasOn && on) {
+			// Only the style went back: name the style that is worn again
+			label = last.kind().name();
+		}
+
+		topBar.toast("Rückgängig: " + label + (shownOn ? " an" : " aus"), channel.category().color, false);
 		Fx.sound("ui.button.click", 0.3f, shownOn ? 1.4f : 0.8f);
 	}
 
