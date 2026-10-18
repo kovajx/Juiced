@@ -12,7 +12,6 @@ import net.minecraft.core.Direction;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.decoration.ArmorStand;
@@ -629,7 +628,8 @@ public final class StrawDummy {
 		private final StrawDummy owner;
 
 		Stand(Level level, StrawDummy owner) {
-			super(EntityType.ARMOR_STAND, level);
+			// The position constructor picks the armor stand entity type itself
+			super(level, 0, 0, 0);
 			this.owner = owner;
 		}
 
