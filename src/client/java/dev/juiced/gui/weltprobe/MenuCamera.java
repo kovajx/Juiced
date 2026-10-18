@@ -105,8 +105,10 @@ public final class MenuCamera {
 
 	private float sway;
 	private Motion motion = Motion.NONE;
+	/** The motion the offsets show: the current one, or the last one while it fades out. */
+	private Motion shownMotion = Motion.NONE;
 	private float motionRate = 1f;
-	/** Camera distance the motion wants (Freelook's Abstand), or NaN for the shot's own. */
+	/** Camera distance the shown motion wants (Freelook's Abstand), or NaN for the shot's own. */
 	private float motionDistance = Float.NaN;
 	private float motionWeight;
 	private float orbitYaw;
@@ -241,6 +243,11 @@ public final class MenuCamera {
 		boolean moves = motion != Motion.NONE && outside && !manual && !moving;
 		motionWeight = Clock.approach(motionWeight, moves ? 1f : 0f, 2.5f);
 
+		if (motion == Motion.NONE && motionWeight < 0.001f) {
+			motionWeight = 0f;
+			shownMotion = Motion.NONE;
+		}
+
 		if (moves && motion == Motion.ORBIT) {
 			orbitYaw = wrap(orbitYaw + dt * ORBIT_SPEED * motionRate * motionWeight);
 		} else {
@@ -309,6 +316,7 @@ public final class MenuCamera {
 		egoOnArrival = false;
 		manual = false;
 		motion = Motion.NONE;
+		shownMotion = Motion.NONE;
 		motionWeight = 0f;
 		orbitYaw = 0f;
 		sway = 0f;
@@ -346,13 +354,18 @@ public final class MenuCamera {
 	 * {@code wantedDistance} is the camera distance it wants (NaN keeps the shot's).
 	 */
 	void motion(Motion motion, float rate, float wantedDistance) {
-		if (this.motion != motion) {
-			motionStart = Clock.t();
-		}
-
 		this.motion = motion;
-		this.motionRate = rate;
-		this.motionDistance = wantedDistance;
+
+		// Stopping keeps the last motion's values, so it fades out instead of jumping back
+		if (motion != Motion.NONE) {
+			if (motion != shownMotion) {
+				motionStart = Clock.t();
+				shownMotion = motion;
+			}
+
+			motionRate = rate;
+			motionDistance = wantedDistance;
+		}
 	}
 
 	/** The camera yaw of the BÜHNE shot, which the straw dummy is placed for. */
@@ -462,13 +475,13 @@ public final class MenuCamera {
 		if (motionWeight > 0f) {
 			double since = t - motionStart;
 
-			if (motion == Motion.SWEEP) {
+			if (shownMotion == Motion.SWEEP) {
 				// Freelook starts straight behind you; the shot is the rear three-quarter, so swing round that first
 				float behind = wrap(anchorBody - toYaw);
 				float swing = SWEEP_DEGREES * (float) Math.sin(since * Math.PI * 2 / SWEEP_SECONDS);
 				offsetYaw += motionWeight * (behind + swing);
 				offsetPitch += motionWeight * 4f * (float) Math.sin(since * Math.PI * 2 / (SWEEP_SECONDS * 0.5));
-			} else if (motion == Motion.ORBIT) {
+			} else if (shownMotion == Motion.ORBIT) {
 				// Zen-Modus breathes its pitch a little while it circles
 				offsetPitch += motionWeight * 5f * (float) Math.sin(since * 0.5);
 			}

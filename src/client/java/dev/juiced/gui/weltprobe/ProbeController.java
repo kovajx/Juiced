@@ -91,7 +91,9 @@ public final class ProbeController {
 	 */
 	public void tune(Channel channel, int focus, boolean deliberate) {
 		if (channel == this.channel && focus == this.focus) {
+			// The same channel again (a click on its lamp): only the camera, a stopped try-out stays stopped
 			aimCamera(channel, deliberate);
+			refreshReason(Minecraft.getInstance(), channel);
 			return;
 		}
 
@@ -127,7 +129,7 @@ public final class ProbeController {
 		}
 
 		selectionAtTune = selection(channel);
-		// Before aiming: Freelook's camera distance is part of its shot
+		// The camera moves of Zen-Modus and Freelook belong to the tune, they start as soon as the camera arrives
 		updateMotion(module);
 		aimCamera(channel, deliberate);
 
