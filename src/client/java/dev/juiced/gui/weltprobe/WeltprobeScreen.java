@@ -1,7 +1,5 @@
 package dev.juiced.gui.weltprobe;
 
-import java.util.ArrayDeque;
-import java.util.Deque;
 import java.util.List;
 
 import org.jspecify.annotations.Nullable;
@@ -23,10 +21,7 @@ import dev.juiced.core.Colors;
 import dev.juiced.core.Config;
 import dev.juiced.core.Hud;
 import dev.juiced.core.MenuState;
-import dev.juiced.core.Module;
-import dev.juiced.core.ModuleGroup;
 import dev.juiced.core.Theme;
-import dev.juiced.core.setting.BoolSetting;
 import dev.juiced.core.setting.ChoiceSetting;
 import dev.juiced.core.setting.ColorSetting;
 import dev.juiced.gui.CameraKeeper;
@@ -49,18 +44,12 @@ public class WeltprobeScreen extends Screen implements CameraKeeper {
 	private static final double SHIFT_GRACE = 0.3;
 	/** Key repeats of the held menu key come within this time of each other (and of the opening). */
 	private static final double REPEAT_WINDOW = 0.7;
-	private static final int UNDO_MAX = 10;
 	private static final String FIRST_CHANNEL = "ambient";
 
 	/** The tuned channel, remembered across openings in this session (-1 before the first opening). */
 	private static int lastChannel = -1;
 	/** "Nur an": off lamps dim and zapping skips them. Kept for the session. */
 	private static boolean onlyOn;
-
-	/** One toggle Strg+Z can take back: the module switch, and the part switch or style that changed with it. */
-	private record Undo(Channel channel, String label, boolean wasOn, @Nullable BoolSetting part, boolean partWas,
-			@Nullable ChoiceSetting kind, int kindWas) {
-	}
 
 	private final MenuCamera camera = new MenuCamera();
 	private final ProbeController probe = new ProbeController(camera);
@@ -72,9 +61,9 @@ public class WeltprobeScreen extends Screen implements CameraKeeper {
 	private final HudStage hudStage = new HudStage();
 	private final TopBar topBar = new TopBar(this);
 	private final StageNotes notes = new StageNotes();
-	private final Deque<Undo> undo = new ArrayDeque<>();
 	private final SettingsList settingsList;
 	private final Drawer drawer;
+	private final Toggles toggles;
 
 	private Layout layout = new Layout(854, 480);
 	private int tuned;
@@ -101,6 +90,7 @@ public class WeltprobeScreen extends Screen implements CameraKeeper {
 			settingsChanged();
 		}), this::openColorPicker);
 		drawer = new Drawer(this, settingsList);
+		toggles = new Toggles(this, probe, dial, topBar, notes, card);
 	}
 
 	// ---- lifecycle ---------------------------------------------------------------------------
@@ -273,7 +263,8 @@ public class WeltprobeScreen extends Screen implements CameraKeeper {
 		drawer.show(channel.module);
 
 		// The tuned channel's own screen part first, under all the chrome
-		hudStage.draw(g, channel, new Hud(this.minecraft, this.width, this.height, partialTick), l.margin);
+		// (not on a server that blocks it: then only the 2D preview says so)
+		hudStage.draw(g, channel.module.blockedHere() ? null : channel, new Hud(this.minecraft, this.width, this.height, partialTick), l.margin);
 
 		if (drawer.isOpen() && !hudStage.dragging()) {
 			boolean left = dockLeft(channel);
@@ -451,7 +442,7 @@ public class WeltprobeScreen extends Screen implements CameraKeeper {
 		Fx.sound("ui.button.click", 0.15f, 1.6f);
 	}
 
-	private void jump(int index) {
+	void jump(int index) {
 		if (index != tuned || probe.focus() >= 0) {
 			tune(index, -1, true);
 			Fx.sound("ui.button.click", 0.25f, 1.2f);
@@ -464,7 +455,7 @@ public class WeltprobeScreen extends Screen implements CameraKeeper {
 			jump(index);
 			openDrawer();
 		} else if (button == 0 && shift) {
-			toggle(channels.get(index));
+			toggles.toggle(channels.get(index));
 		} else if (button == 0) {
 			jump(index);
 		}
@@ -486,7 +477,7 @@ public class WeltprobeScreen extends Screen implements CameraKeeper {
 	}
 
 	void toggleTuned() {
-		toggle(channels.get(tuned));
+		toggles.toggle(channels.get(tuned));
 	}
 
 	void toggleDrawer() {
@@ -497,7 +488,7 @@ public class WeltprobeScreen extends Screen implements CameraKeeper {
 		}
 	}
 
-	private void openDrawer() {
+	void openDrawer() {
 		drawer.show(channels.get(tuned).module);
 		drawer.open(dockLeft(channels.get(tuned)));
 		notes.used();
@@ -527,188 +518,26 @@ public class WeltprobeScreen extends Screen implements CameraKeeper {
 		probe.restyled();
 	}
 
-	private void toggle(Channel channel) {
-		Module module = channel.module;
-
-		if (module.alwaysOn()) {
-			// System modules can't be switched off: their settings are the point
-			jump(channel.index);
-			openDrawer();
-			return;
-		}
-
-		if (module.blockedHere()) {
-			deny();
-			return;
-		}
-
-		remember(channel, channel.name(), null, null);
-		module.toggle();
-		switched(channel, channel.name(), module.isSwitchedOn());
-	}
-
-	/** After the module's own switch flipped: the try-out, the lamp, the sound and the toast follow. */
-	private void switched(Channel channel, String label, boolean on) {
-		if (channel.index == tuned) {
-			probe.toggled(channel.module.isSwitchedOn());
-		}
-
-		dial.juice(channel.index, channel.module.isSwitchedOn());
-		Fx.sound("ui.button.click", 0.3f, on ? 1.4f : 0.8f);
-		topBar.toast(label + (on ? " an" : " aus"), channel.category().color, true);
-		notes.toggled();
-	}
-
-	/**
-	 * Enter on a search hit. A whole channel toggles. A bundle part turns that part and the bundle on, and the next
-	 * Enter turns the part off again. A choice entry switches the card on with that style, the next Enter switches
-	 * it off.
-	 */
+	/** Enter (or Space after Enter) in a search: toggles the selected hit and marks the query as done. */
 	private void toggleHit() {
 		SearchHit hit = search.current();
 
 		if (hit == null) {
-			deny();
+			Toggles.deny();
 			return;
 		}
 
 		search.finish();
-		Channel channel = hit.channel();
-		Module module = channel.module;
-		ModuleGroup group = channel.group();
-
-		if (channel.index != tuned || probe.focus() != hit.focus()) {
-			tune(channel.index, hit.focus(), true);
-		}
-
-		if (!hit.isPart() || group == null || module.alwaysOn()) {
-			toggle(channel);
-			return;
-		}
-
-		if (module.blockedHere()) {
-			deny();
-			return;
-		}
-
-		if (group.isChoice()) {
-			ChoiceSetting kind = group.kindSetting();
-
-			if (kind == null) {
-				toggle(channel);
-				return;
-			}
-
-			remember(channel, hit.label(), null, kind);
-
-			if (!module.isSwitchedOn()) {
-				kind.set(hit.focus());
-				module.toggle();
-				switched(channel, hit.label(), true);
-			} else if (kind.index() != hit.focus()) {
-				kind.set(hit.focus());
-				probe.restyled();
-				card.styleChanged();
-				topBar.toast(hit.label() + " an", channel.category().color, true);
-				Fx.sound("ui.button.click", 0.3f, 1.4f);
-				notes.toggled();
-			} else {
-				module.toggle();
-				switched(channel, channel.name(), false);
-			}
-
-			return;
-		}
-
-		List<BoolSetting> toggles = group.partToggles();
-
-		if (hit.focus() < 0 || hit.focus() >= toggles.size()) {
-			toggle(channel);
-			return;
-		}
-
-		BoolSetting part = toggles.get(hit.focus());
-		remember(channel, hit.label(), part, null);
-
-		if (!module.isSwitchedOn()) {
-			part.set(true);
-			module.toggle();
-			switched(channel, hit.label(), true);
-		} else if (!part.on()) {
-			part.set(true);
-			probe.restyled();
-			topBar.toast(hit.label() + " an", channel.category().color, true);
-			Fx.sound("ui.button.click", 0.3f, 1.4f);
-			notes.toggled();
-		} else {
-			part.set(false);
-
-			if (toggles.stream().noneMatch(BoolSetting::on)) {
-				// That was the last part: the whole bundle goes off
-				module.toggle();
-				switched(channel, hit.label(), false);
-			} else {
-				probe.restyled();
-				topBar.toast(hit.label() + " aus", channel.category().color, true);
-				Fx.sound("ui.button.click", 0.3f, 0.8f);
-			}
-		}
+		toggles.toggleHit(hit);
 	}
 
-	private void remember(Channel channel, String label, @Nullable BoolSetting part, @Nullable ChoiceSetting kind) {
-		undo.push(new Undo(channel, label, channel.module.isSwitchedOn(), part, part != null && part.on(), kind, kind != null ? kind.index() : 0));
-
-		while (undo.size() > UNDO_MAX) {
-			undo.removeLast();
-		}
+	int tuned() {
+		return tuned;
 	}
 
-	/** Strg+Z: puts the last toggle back. */
-	private void undo() {
-		Undo last = undo.poll();
-
-		if (last == null) {
-			deny();
-			return;
-		}
-
-		Channel channel = last.channel();
-		Module module = channel.module;
-		boolean wasOn = module.isSwitchedOn();
-
-		if (last.part() != null) {
-			last.part().set(last.partWas());
-		}
-
-		if (last.kind() != null) {
-			last.kind().set(last.kindWas());
-		}
-
-		if (module.isSwitchedOn() != last.wasOn()) {
-			module.toggle();
-		}
-
-		boolean on = module.isSwitchedOn();
-
-		if (channel.index == tuned) {
-			if (on != wasOn) {
-				probe.toggled(on);
-			} else {
-				probe.restyled();
-			}
-		}
-
-		if (on != wasOn) {
-			dial.juice(channel.index, on);
-		}
-
-		boolean shownOn = last.part() != null ? last.partWas() && on : on;
-		topBar.toast("Rückgängig: " + last.label() + (shownOn ? " an" : " aus"), channel.category().color, false);
-		Fx.sound("ui.button.click", 0.3f, shownOn ? 1.4f : 0.8f);
-	}
-
-	private static void deny() {
-		Fx.sound("block.note_block.bass", 0.3f, 0.6f);
+	/** A deliberate jump to a channel, showing only one part or entry when {@code focus} is not -1. */
+	void tuneTo(int index, int focus) {
+		tune(index, focus, true);
 	}
 
 	// ---- search ------------------------------------------------------------------------------
@@ -725,6 +554,13 @@ public class WeltprobeScreen extends Screen implements CameraKeeper {
 
 		if (hit != null && (hit.channel().index != tuned || probe.focus() != hit.focus())) {
 			tune(hit.channel().index, hit.focus(), true);
+		}
+	}
+
+	/** The query is gone: a try-out that showed only one part or entry shows the whole channel again. */
+	private void searchEnded() {
+		if (probe.focus() >= 0) {
+			tune(tuned, -1, true);
 		}
 	}
 
@@ -877,7 +713,7 @@ public class WeltprobeScreen extends Screen implements CameraKeeper {
 			int key = event.key();
 
 			if (key == InputConstants.KEY_Z) {
-				undo();
+				toggles.undo();
 				return true;
 			}
 
@@ -895,6 +731,7 @@ public class WeltprobeScreen extends Screen implements CameraKeeper {
 		if (event.isEscape()) {
 			if (search.active()) {
 				search.clear();
+				searchEnded();
 			} else if (drawer.isOpen()) {
 				drawer.close();
 			} else {
@@ -913,7 +750,12 @@ public class WeltprobeScreen extends Screen implements CameraKeeper {
 		if (event.key() == InputConstants.KEY_BACKSPACE) {
 			if (search.active()) {
 				search.backspace();
-				tuneBestHit();
+
+				if (search.active()) {
+					tuneBestHit();
+				} else {
+					searchEnded();
+				}
 			} else if (previous >= 0) {
 				// TV "last channel": pressing it again goes back and forth between two
 				jump(previous);
@@ -991,6 +833,11 @@ public class WeltprobeScreen extends Screen implements CameraKeeper {
 		String typed = event.codepointAsString();
 
 		if (typed.isEmpty() || channels.isEmpty()) {
+			return false;
+		}
+
+		if (this.minecraft.hasControlDown()) {
+			// Strg+Z, Strg+G and Strg+H are shortcuts, not search letters
 			return false;
 		}
 

@@ -41,9 +41,9 @@ final class StageNotes {
 		}
 	}
 
-	/** The second hints were used (a search, the drawer): the coach mark fades out. */
+	/** A search or the drawer was used: whoever does that has found their way, so the coach mark fades out. */
 	void used() {
-		if (coach == 2) {
+		if (coach != 0) {
 			coachEndAt = Math.min(coachEndAt, Clock.t());
 		}
 	}
