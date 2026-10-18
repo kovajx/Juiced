@@ -299,6 +299,8 @@ public class WeltprobeScreen extends Screen implements CameraKeeper {
 		}
 
 		notes.drawCoach(g, l);
+		// The chrome draws above everything on the stage, text included
+		g.nextStratum();
 
 		// Opening: the card slides in from the left, the dial rises from below
 		float cardIn = openPhase(0.1, 0.2);
@@ -321,6 +323,8 @@ public class WeltprobeScreen extends Screen implements CameraKeeper {
 		dial.draw(g, l, hits, mouseX, mouseY, tuned, onlyOn, search);
 		Ui.alpha = 1f;
 		g.pose().popMatrix();
+		// The bubble covers the card and the drawer
+		g.nextStratum();
 		dial.drawBubble(g, l);
 
 		Ui.alpha = topIn;
@@ -665,8 +669,11 @@ public class WeltprobeScreen extends Screen implements CameraKeeper {
 			return true;
 		}
 
+		boolean shift = shiftHeld(this.minecraft.hasShiftDown());
+		// Some systems turn Shift+wheel into a sideways scroll
+		double amount = scrollY == 0 && shift ? scrollX : scrollY;
 		// Trackpads send small steps: collect them until they make a whole notch
-		wheel += scrollY;
+		wheel += amount;
 		int steps = (int) wheel;
 
 		if (steps == 0) {
@@ -675,7 +682,6 @@ public class WeltprobeScreen extends Screen implements CameraKeeper {
 
 		wheel -= steps;
 		int direction = steps > 0 ? -1 : 1;
-		boolean shift = shiftHeld(this.minecraft.hasShiftDown());
 
 		for (int i = 0; i < Math.abs(steps); i++) {
 			if (shift) {

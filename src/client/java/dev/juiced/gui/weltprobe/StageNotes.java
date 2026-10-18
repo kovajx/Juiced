@@ -116,7 +116,12 @@ final class StageNotes {
 		Ui.fill(g, x, y, x + size, y + size, Colors.argb(0.7f, rgb));
 		Ui.fill(g, x + 2, y + 2, x + size - 2, y + size - 2, 0xCC0A0A0F);
 		module.drawPreview(g, x + 2, y + 2, size - 4, size - 4, Clock.tf());
-		Ui.centered(g, Ui.ellipsize(caption, Math.max(size, right - left - 16)), x + size / 2f, y + size + 8, Ui.DIM);
+		// A dark backing keeps the caption readable over a bright sky
+		String text = Ui.ellipsize(caption, Math.max(size, right - left - 16));
+		int half = Ui.width(text) / 2 + 4;
+		int cx = x + size / 2;
+		Ui.fill(g, cx - half, y + size + 6, cx + half, y + size + 17, 0x99000000);
+		Ui.centered(g, text, cx, y + size + 8, Ui.DIM);
 	}
 
 	/** Frame position and size {x, y, size} centred in a region, kept clear of the coach mark. */
