@@ -8,6 +8,7 @@ import java.util.function.Supplier;
 import org.jspecify.annotations.Nullable;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.world.entity.LivingEntity;
 
 import dev.juiced.JuicedClient;
@@ -31,16 +32,27 @@ import dev.juiced.render.Fx;
  * "Zu eng für die Kamera"). While the module runs, every client tick calls {@code module.probeTick} and drives the
  * straw dummy for the channel's {@link DummyMode}; {@code module.probeLiveReason} is checked about once a second
  * and decides between the live view and the 2D preview.
+ *
+ * <p>The tick count handed to {@code probeTick} starts at 0 on every tune (and when a stopped try-out starts
+ * again), so modules can tell a new tune from a running one. Every module hook runs at {@link Fx#volumeScale} 0.6.
  */
 public final class ProbeController {
 	/** One hit every 1.1 s. */
 	private static final int HIT_TICKS = 22;
-	/** The first hit after the dummy came up out of the ground. */
+	/** The knockback comet needs longer: the flight, its distance label and the slide home. */
+	private static final int KNOCK_TICKS = 48;
+	/** The first hit after tuning, once the dummy came up out of the ground. */
 	private static final int FIRST_HIT_TICKS = 10;
 	private static final int REASON_TICKS = 20;
 	private static final float DAMAGE = 4.5f;
 	/** Effects on the dummy play a little quieter than in a real fight. */
 	private static final float PROBE_VOLUME = 0.6f;
+	private static final String TOO_CRAMPED = "Zu eng für die Kamera";
+	/**
+	 * Effects you only see from outside, like cosmetics: rings and prints on the ground around you, the koi pond,
+	 * the raked sand, your trail's orbit, the shadow pet. From your eyes (no room for the camera) they show 2D.
+	 */
+	private static final Set<String> OUTSIDE_ONLY = Set.of("jump_circles", "footprints", "koi_pond", "zen_garden", "trails", "shadow_pet");
 
 	private final MenuCamera camera;
 	private final StrawDummy dummy = new StrawDummy();
@@ -49,11 +61,15 @@ public final class ProbeController {
 
 	private @Nullable Channel channel;
 	private int focus = -1;
+	/** The shot the camera was sent to for the channel (EGO when cramped, KEEP for 2D). */
+	private Shot shot = Shot.KEEP;
 	/** Switched off in the menu: the effect stays stopped until the channel is tuned again. */
 	private boolean paused;
 	private boolean blocked;
 	/** The channel's third-person shot had no room, so the camera shows your own view. */
 	private boolean cramped;
+	/** The world the channel was tuned in, to notice a dimension change. */
+	private @Nullable ClientLevel world;
 	private int ticks;
 	private int reasonTimer;
 	private @Nullable String liveReason;
@@ -79,6 +95,8 @@ public final class ProbeController {
 			return;
 		}
 
+		MenuWatch.watch(this);
+		Minecraft minecraft = Minecraft.getInstance();
 		Channel previous = this.channel;
 		Module module = channel.module;
 
@@ -90,28 +108,13 @@ public final class ProbeController {
 		this.channel = channel;
 		this.focus = focus;
 		paused = false;
+		world = minecraft.level;
 		ticks = 0;
-		reasonTimer = 0;
-		liveReason = null;
 		hits = 0;
-		lastHitTick = -HIT_TICKS;
+		lastHitTick = -KNOCK_TICKS;
 		totemPops = 0;
 		sprintNext = true;
 		blocked = module.blockedHere();
-		Shot shot = aimCamera(channel, deliberate);
-
-		if (channel.dummy == DummyMode.NONE || blocked) {
-			dummy.remove(dummy.placed());
-		} else {
-			if (!dummy.placed() && !dummy.hasRoom()) {
-				dummy.place(camera.stageYaw(), camera.viewYaw(), shot.firstPerson);
-			} else if (!dummy.placed() && dummy.hasRoom()) {
-				// Growing back after a kill on the previous channel: that continues by itself
-			}
-
-			hitTimer = FIRST_HIT_TICKS;
-		}
-
 		ModuleGroup group = channel.group();
 
 		// The focus first, so the parts switch on once, already showing the right one
@@ -124,6 +127,23 @@ public final class ProbeController {
 		}
 
 		selectionAtTune = selection(channel);
+		// Before aiming: Freelook's camera distance is part of its shot
+		updateMotion(module);
+		aimCamera(channel, deliberate);
+
+		if (channel.dummy == DummyMode.NONE || blocked) {
+			removeDummy();
+		} else {
+			if (!dummy.placed() && !dummy.regrowing()) {
+				placeDummy();
+			}
+
+			hitTimer = FIRST_HIT_TICKS;
+		}
+
+		// Right away, so the first frame already shows the live view or the right 2D caption
+		reasonTimer = REASON_TICKS;
+		refreshReason(minecraft, channel);
 	}
 
 	public @Nullable Channel channel() {
@@ -136,18 +156,22 @@ public final class ProbeController {
 
 	/** Stops the probe and takes the dummy away (closing, or handing over to the wardrobe or HUD editor). Leaves the camera alone. */
 	public void stop() {
+		MenuWatch.unwatch(this);
 		Channel current = channel;
 
 		if (current != null) {
 			release(current.module);
 		}
 
-		CombatEvents.endProbe(dummy.entity());
-		dummy.remove(dummy.placed());
-		camera.motion(MenuCamera.Motion.NONE, 1f);
+		removeDummy();
+		camera.motion(MenuCamera.Motion.NONE, 1f, Float.NaN);
 		channel = null;
 		focus = -1;
+		shot = Shot.KEEP;
 		paused = false;
+		blocked = false;
+		cramped = false;
+		world = null;
 		liveReason = null;
 	}
 
@@ -161,7 +185,15 @@ public final class ProbeController {
 		}
 
 		Module module = current.module;
-		ticks++;
+		boolean needsDummy = current.dummy != DummyMode.NONE;
+
+		if (minecraft.level != world) {
+			// Another world (a dimension change, a respawn): look for room for the camera and the dummy there
+			world = minecraft.level;
+			aimCamera(current, true);
+			reasonTimer = 0;
+		}
+
 		dummy.tick();
 
 		// The drawer can block or allow the current server while the channel is tuned
@@ -173,13 +205,16 @@ public final class ProbeController {
 
 			if (blocked) {
 				module.setProbe(false);
-				dummy.remove(dummy.placed());
+				removeDummy();
 			} else if (!paused && !module.isSwitchedOn()) {
 				module.setProbe(true);
+				ticks = 0;
 			}
+
+			aimCamera(current, true);
 		}
 
-		boolean running = module.isEnabled() && !paused;
+		boolean running = running(module);
 
 		if (running) {
 			int tick = ticks;
@@ -188,30 +223,40 @@ public final class ProbeController {
 
 		if (--reasonTimer <= 0) {
 			reasonTimer = REASON_TICKS;
+			Shot wanted = current.shot;
 
-			// While paused the last answer stays, so the picture doesn't jump when you switch it off
-			if (!paused) {
-				liveReason = running ? ask(module, () -> module.probeLiveReason(minecraft)) : null;
+			// The room can change (a teleport, blocks placed next to you): pick the shot again if it did
+			if (!blocked && !current.isHud() && wanted != Shot.KEEP && !wanted.firstPerson && camera.fits(wanted) == cramped) {
+				boolean wasCramped = cramped;
+				aimCamera(current, true);
+
+				if (needsDummy && wasCramped != cramped) {
+					// In front of you for your own view, beside you for the stage
+					removeDummy();
+				}
 			}
 
 			// Back from another world, or the ground changed: look for a spot again
-			if (current.dummy != DummyMode.NONE && !blocked && !dummy.placed() && !dummy.hasRoom()) {
-				dummy.place(camera.stageYaw(), camera.viewYaw(), cramped || camera.shot().firstPerson);
+			if (needsDummy && !blocked && !dummy.placed() && !dummy.regrowing()) {
+				placeDummy();
 			}
+
+			refreshReason(minecraft, current);
 		}
 
-		if (running && current.dummy != DummyMode.NONE) {
+		if (running && needsDummy) {
 			if (hitTimer > 0) {
 				hitTimer--;
 			}
 
 			if (hitTimer <= 0 && dummy.ready()) {
 				hit(current);
-				hitTimer = HIT_TICKS;
+				hitTimer = current.dummy == DummyMode.KNOCKBACK ? KNOCK_TICKS : HIT_TICKS;
 			}
 		}
 
-		camera.motion(running ? motionOf(module) : MenuCamera.Motion.NONE, motionRate(module));
+		updateMotion(module);
+		ticks++;
 	}
 
 	/** Every frame before the menu draws (dummy wobble, smooth dummy motion). */
@@ -228,7 +273,7 @@ public final class ProbeController {
 
 		Module module = current.module;
 
-		if (module.blockedHere()) {
+		if (blocked) {
 			return ProbeStatus.GESPERRT;
 		}
 
@@ -258,29 +303,12 @@ public final class ProbeController {
 			return null;
 		}
 
-		Module module = current.module;
-
-		if (module.blockedHere()) {
+		if (blocked) {
 			return "Auf diesem Server gesperrt";
 		}
 
-		if (cramped) {
-			// Effects that are only worth seeing from outside: cosmetics, and the two camera moves
-			if (current.category() == Category.COSMETICS) {
-				return "Zu eng für die Kamera";
-			}
-
-			if (module.id.equals("zen_mode")) {
-				return "Hier kein Platz zum Kreisen";
-			}
-
-			if (module.id.equals("freelook")) {
-				return "Hier kein Platz hinter dir";
-			}
-		}
-
 		if (current.dummy != DummyMode.NONE) {
-			if (!dummy.hasRoom()) {
+			if (!dummy.hasRoom() && !dummy.regrowing()) {
 				return "Kein Platz für die Puppe";
 			}
 
@@ -289,15 +317,28 @@ public final class ProbeController {
 			}
 		}
 
-		if (current.isHud() && current.hudModule() != null) {
-			return null;
+		if (current.shot == Shot.KEEP) {
+			String card = keepCaption(current.module);
+
+			// A bundle shown as a whole gets the card's own caption; a part, or a single module, says it itself
+			if (card != null && current.group() != null && focus < 0) {
+				return card;
+			}
+
+			if (liveReason != null) {
+				return liveReason;
+			}
+
+			if (card != null) {
+				return card;
+			}
+
+			// A colour filter on the whole picture shows live in any shot
+			return current.module.id.equals("screen_effects") ? null : "Wirkt beim Spielen";
 		}
 
-		if (liveReason != null) {
-			return liveReason;
-		}
-
-		return current.shot == Shot.KEEP ? keepCaption(module) : null;
+		// HUD channels show live unless the module says its element would be empty
+		return liveReason;
 	}
 
 	/**
@@ -316,11 +357,15 @@ public final class ProbeController {
 		ModuleGroup group = current.group();
 
 		if (on) {
-			paused = false;
-
 			// Keep what the try-out showed: the focused entry becomes the chosen style, the focused part gets switched on
 			if (group != null) {
 				keepShown(group);
+			}
+
+			if (paused) {
+				// It was stopped, so it starts again from the beginning
+				paused = false;
+				ticks = 0;
 			}
 
 			module.setProbe(false);
@@ -334,9 +379,9 @@ public final class ProbeController {
 			group.setProbeFocus(-1);
 		}
 
-		focus = on ? focus : -1;
-		reasonTimer = 0;
 		selectionAtTune = selection(current);
+		reasonTimer = REASON_TICKS;
+		refreshReason(Minecraft.getInstance(), current);
 	}
 
 	/** A style or setting changed (Up/Down, drawer): re-sync the try-out so it shows the change in the same frame. */
@@ -357,10 +402,14 @@ public final class ProbeController {
 		}
 
 		selectionAtTune = now;
-		reasonTimer = 0;
+		reasonTimer = REASON_TICKS;
+		refreshReason(Minecraft.getInstance(), current);
+		updateMotion(current.module);
 
 		// Show the change on the dummy soon, but don't hit faster than twice a second while a slider is dragged
-		if (current.dummy != DummyMode.NONE && ticks - lastHitTick >= HIT_TICKS / 2) {
+		int gap = current.dummy == DummyMode.KNOCKBACK ? KNOCK_TICKS - 4 : HIT_TICKS / 2;
+
+		if (current.dummy != DummyMode.NONE && ticks - lastHitTick >= gap) {
 			hitTimer = Math.min(hitTimer, 3);
 		}
 	}
@@ -372,21 +421,29 @@ public final class ProbeController {
 
 	// ---- internals -----------------------------------------------------------------------------
 
-	/** Aims the camera for a channel and returns the shot it goes to (KEEP: it stays). */
-	private Shot aimCamera(Channel channel, boolean deliberate) {
-		Shot shot = channel.shot;
+	/** The tuned module runs for the menu: on or tried out, not stopped in the menu, allowed here. */
+	private boolean running(Module module) {
+		return module.isEnabled() && !paused && !blocked;
+	}
+
+	/** Aims the camera for a channel and remembers the shot it goes to (KEEP: it stays). */
+	private void aimCamera(Channel channel, boolean deliberate) {
+		Shot wanted = channel.shot;
 		cramped = false;
 
-		if (channel.isHud()) {
+		if (blocked) {
+			// Only the 2D preview shows: the camera stays where it is
+			wanted = Shot.KEEP;
+		} else if (channel.isHud()) {
 			// The HUD is drawn over your own view; from a first-person shot (or a 2D one) the camera stays
-			shot = camera.thirdPerson() ? Shot.EGO : Shot.KEEP;
-		} else if (shot != Shot.KEEP && !shot.firstPerson && !camera.fits(shot)) {
+			wanted = camera.thirdPerson() ? Shot.EGO : Shot.KEEP;
+		} else if (wanted != Shot.KEEP && !wanted.firstPerson && !camera.fits(wanted)) {
 			cramped = true;
-			shot = Shot.EGO;
+			wanted = Shot.EGO;
 		}
 
-		camera.aim(shot, channel.aimYaw, channel.aimPitch, deliberate);
-		return shot;
+		camera.aim(wanted, channel.aimYaw, channel.aimPitch, deliberate);
+		shot = wanted;
 	}
 
 	/** Ends the try-out of a module: its effects stop unless it is switched on. */
@@ -398,10 +455,94 @@ public final class ProbeController {
 		}
 	}
 
+	/** Beside you for the stage, in front of you when the camera shows your own view. */
+	private void placeDummy() {
+		dummy.place(camera.stageYaw(), camera.viewYaw(), shot.firstPerson);
+	}
+
+	/** The dummy goes in a straw puff, and stops being the combat target. */
+	private void removeDummy() {
+		CombatEvents.endProbe(dummy.entity());
+		dummy.remove(dummy.placed());
+	}
+
+	/** Asks the module whether it can be seen right now; while it is stopped in the menu the last answer stays. */
+	private void refreshReason(Minecraft minecraft, Channel current) {
+		if (paused) {
+			// So the picture doesn't jump when you switch it off
+			return;
+		}
+
+		Module module = current.module;
+
+		if (!running(module)) {
+			liveReason = null;
+			return;
+		}
+
+		liveReason = cramped ? crampedReason(minecraft, module) : ask(module, () -> module.probeLiveReason(minecraft));
+	}
+
+	/**
+	 * The camera stays in your eyes because there is no room behind it: effects you only see from outside can't be
+	 * shown. A bundle stays live if one of its running parts can be seen from the eyes.
+	 */
+	private @Nullable String crampedReason(Minecraft minecraft, Module module) {
+		if (module.category == Category.COSMETICS) {
+			return TOO_CRAMPED;
+		}
+
+		if (module instanceof ModuleGroup group) {
+			String reason = null;
+			boolean any = false;
+			boolean outside = false;
+
+			for (Module part : group.parts()) {
+				if (!part.isEnabled()) {
+					continue;
+				}
+
+				any = true;
+
+				if (outsideOnly(part)) {
+					outside = true;
+					continue;
+				}
+
+				String partReason = ask(module, () -> part.probeLiveReason(minecraft));
+
+				if (partReason == null) {
+					return null;
+				}
+
+				if (reason == null) {
+					reason = partReason;
+				}
+			}
+
+			if (!any) {
+				return ask(module, () -> module.probeLiveReason(minecraft));
+			}
+
+			return outside ? TOO_CRAMPED : reason;
+		}
+
+		return outsideOnly(module) ? TOO_CRAMPED : ask(module, () -> module.probeLiveReason(minecraft));
+	}
+
+	private static boolean outsideOnly(Module module) {
+		return module.category == Category.COSMETICS || OUTSIDE_ONLY.contains(module.id);
+	}
+
 	private void hit(Channel current) {
 		LivingEntity target = dummy.entity();
 
 		if (target == null) {
+			return;
+		}
+
+		if (current.dummy == DummyMode.KNOCKBACK && !dummy.canFly()) {
+			// No room to fly: the 2D preview shows instead, and a comet without a flight would look broken
 			return;
 		}
 
@@ -438,6 +579,7 @@ public final class ProbeController {
 
 				if (fourth) {
 					int pops = ++totemPops;
+					dummy.totemPopped();
 					call(module, () -> module.onTotemPop(target, pops));
 				}
 			}
@@ -487,36 +629,41 @@ public final class ProbeController {
 		}
 	}
 
-	/** Caption for channels that only have the 2D preview, when the module gives none itself. */
+	/** Caption for channels that only have the 2D preview, for when the module gives none itself; null if not listed. */
 	private static @Nullable String keepCaption(Module module) {
 		return switch (module.id) {
-			// A colour filter on the whole picture: live in any shot
-			case "screen_effects" -> null;
 			case "theme" -> "Färbt Menü und Effekte";
 			case "performance" -> "Wirkt auf alle Effekte";
 			case "explosions" -> "Wirkt bei Explosionen";
 			case "smooth_ui" -> "Wirkt in Hotbar & Inventar";
-			default -> "Wirkt beim Spielen";
+			default -> null;
 		};
 	}
 
-	/** Channels whose effect is a camera move get it from the menu camera. */
-	private static MenuCamera.Motion motionOf(Module module) {
-		if (module.id.equals("zen_mode")) {
-			BoolSetting orbit = setting(module, "orbit", BoolSetting.class);
-			return orbit == null || orbit.on() ? MenuCamera.Motion.ORBIT : MenuCamera.Motion.NONE;
+	/** Channels whose effect is a camera move get it from the menu camera while they run. */
+	private void updateMotion(Module module) {
+		MenuCamera.Motion motion = MenuCamera.Motion.NONE;
+		float rate = 1f;
+		float distance = Float.NaN;
+
+		if (running(module)) {
+			if (module.id.equals("zen_mode")) {
+				BoolSetting orbit = setting(module, "orbit", BoolSetting.class);
+				SliderSetting speed = setting(module, "speed", SliderSetting.class);
+
+				// Zen-Modus without "Kamera kreist langsam" doesn't move the camera either
+				if (orbit == null || orbit.on()) {
+					motion = MenuCamera.Motion.ORBIT;
+					rate = speed != null ? speed.f() : 1f;
+				}
+			} else if (module.id.equals("freelook")) {
+				SliderSetting reach = setting(module, "distance", SliderSetting.class);
+				motion = MenuCamera.Motion.SWEEP;
+				distance = reach != null ? reach.f() : Float.NaN;
+			}
 		}
 
-		if (module.id.equals("freelook") && !module.blockedHere()) {
-			return MenuCamera.Motion.SWEEP;
-		}
-
-		return MenuCamera.Motion.NONE;
-	}
-
-	private static float motionRate(Module module) {
-		SliderSetting speed = module.id.equals("zen_mode") ? setting(module, "speed", SliderSetting.class) : null;
-		return speed != null ? speed.f() : 1f;
+		camera.motion(motion, rate, distance);
 	}
 
 	private static <S extends Setting<?>> @Nullable S setting(Module module, String id, Class<S> type) {

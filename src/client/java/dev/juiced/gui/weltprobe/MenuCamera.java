@@ -26,6 +26,9 @@ import dev.juiced.render.FreeCamera;
  * is a 400 ms pitch tween, moves between third-person shots are 500 ms orbits; a new target mid-move retargets
  * smoothly from where the camera is. NAH_FRONT sways ±10° yaw with a 7 s sine. A left-drag on the stage orbits by
  * hand (0.15° per pixel, pitch -30..60) until the next shot change; a double-click glides back to the shot.
+ *
+ * <p>Two channels are camera moves themselves, played on top of their shot once the camera has arrived: Zen-Modus
+ * slowly circles you (at the module's Tempo), Freelook swings the view left and right behind you (at its Abstand).
  */
 public final class MenuCamera {
 	/** Extra movement on top of a third-person shot, for channels whose effect is a camera move. */
@@ -47,16 +50,25 @@ public final class MenuCamera {
 	private static final float ORBIT_SECONDS = 0.5f;
 	private static final float RESET_SECONDS = 0.3f;
 	private static final float DRAG_DEGREES_PER_PIXEL = 0.15f;
+	/** Degrees per second of the Zen orbit at Tempo 100 %. Zen-Modus itself turns at 4.5, too slow to see in a short look. */
+	private static final float ORBIT_SPEED = 12f;
+	/** The Freelook look-around: this far to each side of straight behind you, once in this many seconds. */
+	private static final float SWEEP_DEGREES = 55f;
+	private static final double SWEEP_SECONDS = 9.0;
+
+	/**
+	 * Whether your own camera is first person, for the glide back when the menu closes. Only an untouched camera
+	 * shows it (not one Freelook, Zen or the wardrobe holds), so the last known answer is kept across openings.
+	 */
+	private static boolean ownFirstPerson = true;
 
 	// How you stood when the menu opened
 	private boolean anchored;
 	private float anchorBody;
 	private float anchorYaw;
 	private float anchorPitch;
-	/** Whether your own camera was first person, for the glide back when the menu closes. */
-	private boolean startedFirstPerson = true;
-	/** The wardrobe took the camera from us; coming back starts from its last view. */
-	private boolean released;
+	/** This camera holds FreeCamera right now (opened, and not closed or handed to the wardrobe). */
+	private boolean holding;
 
 	/** The shot the camera is at or moving to; null for the view the menu opened from (not a shot). */
 	private @Nullable Shot shot;
@@ -94,6 +106,8 @@ public final class MenuCamera {
 	private float sway;
 	private Motion motion = Motion.NONE;
 	private float motionRate = 1f;
+	/** Camera distance the motion wants (Freelook's Abstand), or NaN for the shot's own. */
+	private float motionDistance = Float.NaN;
 	private float motionWeight;
 	private float orbitYaw;
 	private double motionStart;
@@ -108,8 +122,9 @@ public final class MenuCamera {
 		}
 
 		anchor(player);
+		MenuWatch.watch(this);
 
-		if (FreeCamera.ownedBy(FreeCamera.Owner.MENU)) {
+		if (holding && FreeCamera.ownedBy(FreeCamera.Owner.MENU)) {
 			// Back from the colour picker: the camera never left
 			return;
 		}
@@ -120,28 +135,23 @@ public final class MenuCamera {
 		float startPitch;
 		float startDistance;
 
-		if (released) {
-			// Back from the wardrobe: continue from its last view, so there's no cut
-			firstPerson = false;
-			startYaw = FreeCamera.yaw();
-			startPitch = FreeCamera.pitch();
-			startDistance = FreeCamera.distance();
-		} else if (FreeCamera.active()) {
-			// Freelook still holds the camera, or our own glide back hasn't finished: carry on from there
-			firstPerson = type.isFirstPerson();
-			startYaw = FreeCamera.yaw();
-			startPitch = FreeCamera.pitch();
-			startDistance = firstPerson ? EYE : FreeCamera.distance();
+		if (FreeCamera.active()) {
+			// Freelook, Zen or the wardrobe holds the camera, or a glide back hasn't finished: go on from exactly
+			// what is on screen, so there's no cut
+			firstPerson = FreeCamera.controlsMouse() ? FreeCamera.ego() : type.isFirstPerson();
+			startYaw = FreeCamera.cameraYaw(player.getYRot());
+			startPitch = FreeCamera.cameraPitch(player.getXRot());
+			startDistance = firstPerson ? EYE : Math.max(EYE, FreeCamera.cameraDistance(4f));
 		} else {
 			firstPerson = type.isFirstPerson();
-			startedFirstPerson = firstPerson;
+			ownFirstPerson = firstPerson;
 			startYaw = player.getYRot() + (type.isMirrored() ? 180f : 0f);
 			startPitch = type.isMirrored() ? -player.getXRot() : player.getXRot();
 			startDistance = firstPerson ? EYE : 4f;
 		}
 
-		released = false;
 		FreeCamera.start(FreeCamera.Owner.MENU, startYaw, startPitch, startDistance);
+		holding = true;
 
 		if (firstPerson) {
 			FreeCamera.setEgo(true);
@@ -153,7 +163,7 @@ public final class MenuCamera {
 		toYaw = yaw;
 		toPitch = pitch;
 		toDistance = distance;
-		// From your own first-person view the camera already is at the EGO shot
+		// From a first-person view the camera already is at the EGO shot, which then doesn't move at all
 		shot = firstPerson ? Shot.EGO : null;
 		shotAimYaw = Float.NaN;
 		shotAimPitch = Float.NaN;
@@ -180,7 +190,8 @@ public final class MenuCamera {
 			return;
 		}
 
-		if (!deliberate) {
+		// The opening glide never waits for the zapping pause
+		if (!deliberate && !opening) {
 			pending = shot;
 			pendingAimYaw = aimYaw;
 			pendingAimPitch = aimPitch;
@@ -194,7 +205,7 @@ public final class MenuCamera {
 
 	/** Every frame: advances the glide and hands the values to FreeCamera. */
 	public void frame() {
-		if (!FreeCamera.ownedBy(FreeCamera.Owner.MENU)) {
+		if (!holding || !FreeCamera.ownedBy(FreeCamera.Owner.MENU)) {
 			return;
 		}
 
@@ -224,14 +235,14 @@ public final class MenuCamera {
 			}
 		}
 
-		boolean outside = !FreeCamera.ego();
+		boolean outside = !FreeCamera.ego() && !egoOnArrival;
 		sway = Clock.approach(sway, shot == Shot.NAH_FRONT && outside && !manual ? 1f : 0f, 3f);
-		boolean moves = motion != Motion.NONE && outside && !manual;
-		motionWeight = Clock.approach(motionWeight, moves ? 1f : 0f, 3f);
+		// The camera moves begin once the camera has arrived at its shot
+		boolean moves = motion != Motion.NONE && outside && !manual && !moving;
+		motionWeight = Clock.approach(motionWeight, moves ? 1f : 0f, 2.5f);
 
 		if (moves && motion == Motion.ORBIT) {
-			// Like Zen-Modus, four times faster so a short look shows it moving
-			orbitYaw = wrap(orbitYaw + dt * 18f * motionRate * motionWeight);
+			orbitYaw = wrap(orbitYaw + dt * ORBIT_SPEED * motionRate * motionWeight);
 		} else {
 			// Back to the shot the short way (a whole turn more or less looks the same)
 			orbitYaw = Clock.approach(wrap(orbitYaw), 0f, 2.5f);
@@ -242,7 +253,7 @@ public final class MenuCamera {
 
 	/** Left-drag on the empty stage: orbit by hand (third-person shots only). */
 	public void drag(double dx, double dy) {
-		if (!FreeCamera.ownedBy(FreeCamera.Owner.MENU) || FreeCamera.ego() || egoOnArrival) {
+		if (!holding || !FreeCamera.ownedBy(FreeCamera.Owner.MENU) || FreeCamera.ego() || egoOnArrival) {
 			return;
 		}
 
@@ -288,7 +299,7 @@ public final class MenuCamera {
 
 	/** True while the camera shows you from outside (third person), so cosmetics are visible. */
 	public boolean thirdPerson() {
-		return FreeCamera.ownedBy(FreeCamera.Owner.MENU) && !FreeCamera.ego() && !egoOnArrival;
+		return holding && FreeCamera.ownedBy(FreeCamera.Owner.MENU) && !FreeCamera.ego() && !egoOnArrival;
 	}
 
 	/** Closing the menu: gives the camera back with the 280 ms glide into your normal view. */
@@ -296,12 +307,21 @@ public final class MenuCamera {
 		pending = null;
 		moving = false;
 		egoOnArrival = false;
+		manual = false;
+		motion = Motion.NONE;
+		motionWeight = 0f;
+		orbitYaw = 0f;
+		sway = 0f;
+		// The next opening looks at how you stand then
+		anchored = false;
+		holding = false;
+		MenuWatch.unwatch(this);
 
 		if (!FreeCamera.ownedBy(FreeCamera.Owner.MENU)) {
 			return;
 		}
 
-		if (FreeCamera.ego() && !startedFirstPerson) {
+		if (FreeCamera.ego() && !ownFirstPerson) {
 			// Your own camera is third person: glide out of the eyes instead of cutting at the end
 			FreeCamera.setEgo(false);
 			FreeCamera.setDistanceFree(EYE);
@@ -315,19 +335,24 @@ public final class MenuCamera {
 		pending = null;
 		moving = false;
 		egoOnArrival = false;
-		released = FreeCamera.ownedBy(FreeCamera.Owner.MENU);
+		holding = false;
+		MenuWatch.unwatch(this);
 	}
 
 	// ---- for the probe controller ----------------------------------------------------------------
 
-	/** Extra movement for channels whose effect is a camera move; {@code rate} scales its speed. */
-	void motion(Motion motion, float rate) {
+	/**
+	 * Extra movement for channels whose effect is a camera move; {@code rate} scales its speed and
+	 * {@code wantedDistance} is the camera distance it wants (NaN keeps the shot's).
+	 */
+	void motion(Motion motion, float rate, float wantedDistance) {
 		if (this.motion != motion) {
 			motionStart = Clock.t();
 		}
 
 		this.motion = motion;
 		this.motionRate = rate;
+		this.motionDistance = wantedDistance;
 	}
 
 	/** The camera yaw of the BÜHNE shot, which the straw dummy is placed for. */
@@ -345,7 +370,7 @@ public final class MenuCamera {
 	// ---- moves -------------------------------------------------------------------------------
 
 	private void moveTo(Shot next, float aimYaw, float aimPitch) {
-		if (!FreeCamera.ownedBy(FreeCamera.Owner.MENU)) {
+		if (!holding || !FreeCamera.ownedBy(FreeCamera.Owner.MENU)) {
 			return;
 		}
 
@@ -407,6 +432,7 @@ public final class MenuCamera {
 		float[] offset = offsets();
 		yaw += offset[0];
 		pitch += offset[1];
+		distance += offset[2];
 		sway = 0f;
 		motionWeight = 0f;
 		orbitYaw = 0f;
@@ -426,35 +452,46 @@ public final class MenuCamera {
 		};
 	}
 
+	/** Yaw, pitch and distance added on top of the shot: the NAH_FRONT sway and the camera moves. */
 	private float[] offsets() {
 		double t = Clock.t();
 		float offsetYaw = sway * 10f * (float) Math.sin(t * Math.PI * 2 / 7.0);
 		float offsetPitch = 0f;
+		float offsetDistance = 0f;
 
 		if (motionWeight > 0f) {
 			double since = t - motionStart;
 
 			if (motion == Motion.SWEEP) {
-				offsetYaw += motionWeight * 60f * (float) Math.sin(since * Math.PI * 2 / 6.0);
+				// Freelook starts straight behind you; the shot is the rear three-quarter, so swing round that first
+				float behind = wrap(anchorBody - toYaw);
+				float swing = SWEEP_DEGREES * (float) Math.sin(since * Math.PI * 2 / SWEEP_SECONDS);
+				offsetYaw += motionWeight * (behind + swing);
+				offsetPitch += motionWeight * 4f * (float) Math.sin(since * Math.PI * 2 / (SWEEP_SECONDS * 0.5));
 			} else if (motion == Motion.ORBIT) {
+				// Zen-Modus breathes its pitch a little while it circles
 				offsetPitch += motionWeight * 5f * (float) Math.sin(since * 0.5);
+			}
+
+			if (!Float.isNaN(motionDistance)) {
+				offsetDistance = motionWeight * (motionDistance - distance);
 			}
 		}
 
 		offsetYaw += orbitYaw;
 
-		return new float[] { offsetYaw, offsetPitch };
+		return new float[] { offsetYaw, offsetPitch, offsetDistance };
 	}
 
 	/** Hands this frame's values to FreeCamera. */
 	private void push() {
-		if (!FreeCamera.ownedBy(FreeCamera.Owner.MENU)) {
+		if (!holding || !FreeCamera.ownedBy(FreeCamera.Owner.MENU)) {
 			return;
 		}
 
 		float[] offset = offsets();
 		FreeCamera.setRotation(yaw + offset[0], pitch + offset[1]);
-		FreeCamera.setDistanceFree(distance);
+		FreeCamera.setDistanceFree(distance + offset[2]);
 	}
 
 	// ---- anchor and room -----------------------------------------------------------------------

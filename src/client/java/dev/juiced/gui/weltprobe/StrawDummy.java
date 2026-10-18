@@ -34,7 +34,11 @@ import dev.juiced.render.Sparks;
  *
  * <p>Its moves (rising out of the ground, the knockback hop and the slide home) are played inside the entity's own
  * tick, right after the game stored the previous position, so everything that draws it or follows it (the knockback
- * comet) sees a smooth path. Its turn and the hit wobble are set every frame.
+ * comet) sees a smooth path. Its turn and the hit wobble are set every frame. Its health never changes.
+ *
+ * <p>Taking it away waits while effects still follow it: until a knockback flight has landed, and for 0.8 s after a
+ * totem pop (the totem ring sits on the entity). It also takes itself away as soon as no screen is open, so it can
+ * never stay behind in the world when the menu goes without cleaning up.
  */
 public final class StrawDummy {
 	private static final int BASE_ID = -742_000;
@@ -44,6 +48,8 @@ public final class StrawDummy {
 	private static final int REGROW_DELAY_TICKS = 16;
 	private static final int LANDED_TICKS = 20;
 	private static final int RETURN_TICKS = 12;
+	/** How long the dummy has to stay after a totem pop, because the totem ring follows it. */
+	private static final int POP_HOLD_TICKS = 16;
 	/** A knockback flight shorter than this isn't worth showing. */
 	private static final double MIN_FLIGHT = 0.8;
 	private static final double MAX_FLIGHT = 2.6;
@@ -64,6 +70,8 @@ public final class StrawDummy {
 
 	/** A spot was found the last time the dummy was placed. */
 	private boolean hasHome;
+	/** The world that spot is in. */
+	private @Nullable ClientLevel homeWorld;
 	private double homeX;
 	private double homeY;
 	private double homeZ;
@@ -83,6 +91,10 @@ public final class StrawDummy {
 	private double landZ;
 	/** Ticks until the dummy grows back after a kill, or 0. */
 	private int regrow;
+	/** Ticks until a dummy that was asked to go actually goes (see {@link #remove}), or 0. */
+	private int leaving;
+	private boolean leavingPuff;
+	private int ticksSincePop = POP_HOLD_TICKS;
 
 	// Hit wobble: a damped spring on the yaw, in degrees
 	private float wobble;
@@ -102,7 +114,15 @@ public final class StrawDummy {
 		Minecraft minecraft = Minecraft.getInstance();
 		LocalPlayer player = minecraft.player;
 		ClientLevel world = minecraft.level;
-		remove(false);
+
+		if (leaving > 0 && stand != null && level == world) {
+			// Asked to go a moment ago and wanted again: it simply stays
+			leaving = 0;
+			return true;
+		}
+
+		regrow = 0;
+		discard();
 		hasHome = false;
 
 		if (player == null || world == null) {
@@ -145,15 +165,21 @@ public final class StrawDummy {
 			return false;
 		}
 
+		homeWorld = world;
 		faceYaw = (float) Math.toDegrees(Math.atan2(-(player.getX() - homeX), player.getZ() - homeZ));
 		measureKnockback(world, player, stageYaw);
 		spawn(world, RISE_TICKS);
 		return true;
 	}
 
-	/** True while the dummy stands in the world. */
+	/** True while the dummy stands in the world (and isn't about to go). */
 	public boolean placed() {
-		return stand != null;
+		return stand != null && leaving == 0;
+	}
+
+	/** True while the dummy is away after a kill and will grow back by itself. */
+	public boolean regrowing() {
+		return regrow > 0;
 	}
 
 	/** True if the last placement found a spot (also while the dummy grows back after a kill). */
@@ -166,13 +192,19 @@ public final class StrawDummy {
 		return hasHome && knockRoom >= MIN_FLIGHT;
 	}
 
+	/** The dummy entity, also while it is about to go (so the combat probe state can be cleared for it). */
 	public @Nullable LivingEntity entity() {
 		return stand;
 	}
 
 	/** Standing at its spot and ready for the next hit. */
 	public boolean ready() {
-		return stand != null && phase == Phase.IDLE;
+		return placed() && phase == Phase.IDLE;
+	}
+
+	/** A totem popped on the dummy: it stays for the ring that follows it, even if it is taken away now. */
+	public void totemPopped() {
+		ticksSincePop = 0;
 	}
 
 	/** A hit: the dummy wobbles, flashes red and makes the armor stand's own hit sound. */
@@ -207,7 +239,7 @@ public final class StrawDummy {
 	public void kill() {
 		Stand target = stand;
 
-		if (target == null) {
+		if (target == null || !placed()) {
 			return;
 		}
 
@@ -216,12 +248,27 @@ public final class StrawDummy {
 		regrow = REGROW_DELAY_TICKS;
 	}
 
-	/** Takes the dummy away, with a straw puff if {@code puff}. */
+	/**
+	 * Takes the dummy away, with a straw puff if {@code puff}. While a knockback flight or a totem ring still
+	 * follows it, it goes a moment later by itself.
+	 */
 	public void remove(boolean puff) {
 		Stand target = stand;
 		regrow = 0;
 
-		if (target != null && puff) {
+		if (target == null) {
+			return;
+		}
+
+		int hold = holdTicks();
+
+		if (hold > 0 && !target.isRemoved() && level == Minecraft.getInstance().level) {
+			leaving = Math.max(leaving, hold);
+			leavingPuff |= puff;
+			return;
+		}
+
+		if (puff) {
 			puff(target.getX(), target.getY(), target.getZ(), false);
 		}
 
@@ -232,10 +279,11 @@ public final class StrawDummy {
 	public void tick() {
 		Minecraft minecraft = Minecraft.getInstance();
 
-		if (level != null && minecraft.level != level) {
-			// Another world: the old one took the entity with it
+		if (homeWorld != null && minecraft.level != homeWorld) {
+			// Another world: the old one took the entity with it, and the spot is gone too
 			forget();
 			hasHome = false;
+			homeWorld = null;
 			return;
 		}
 
@@ -422,7 +470,8 @@ public final class StrawDummy {
 		ClientLevel world = level;
 
 		if (target != null) {
-			if (world != null && !target.isRemoved()) {
+			// A world that was left took the entity with it
+			if (world != null && world == Minecraft.getInstance().level && !target.isRemoved()) {
 				world.removeEntity(target.getId(), Entity.RemovalReason.DISCARDED);
 			}
 
@@ -432,6 +481,8 @@ public final class StrawDummy {
 		stand = null;
 		level = null;
 		phase = Phase.IDLE;
+		leaving = 0;
+		leavingPuff = false;
 	}
 
 	/** Drops the reference without touching the world (it is gone already). */
@@ -446,6 +497,20 @@ public final class StrawDummy {
 		level = null;
 		regrow = 0;
 		phase = Phase.IDLE;
+		leaving = 0;
+		leavingPuff = false;
+	}
+
+	/** Ticks the dummy still has to stay for the effects that follow it. */
+	private int holdTicks() {
+		int hold = Math.max(0, POP_HOLD_TICKS - ticksSincePop);
+
+		if (phase == Phase.FLY) {
+			// Land first; the comet must never lose its target in the air
+			hold = Math.max(hold, flightTicks - phaseTick + 2);
+		}
+
+		return hold;
 	}
 
 	// ---- moving --------------------------------------------------------------------------------
@@ -453,6 +518,30 @@ public final class StrawDummy {
 	/** One tick of the current move. Runs inside the entity's tick, after the game kept the old position. */
 	private void step(Stand target) {
 		if (target != stand) {
+			// Not ours any more (never expected): don't leave it standing around
+			target.discard();
+			return;
+		}
+
+		if (ticksSincePop < POP_HOLD_TICKS) {
+			ticksSincePop++;
+		}
+
+		if (leaving == 0 && Minecraft.getInstance().gui.screen() == null) {
+			// The menu went without taking the dummy away
+			remove(true);
+		}
+
+		if (leaving > 0 && --leaving == 0) {
+			if (leavingPuff) {
+				puff(target.getX(), target.getY(), target.getZ(), false);
+			}
+
+			discard();
+			return;
+		}
+
+		if (stand != target) {
 			return;
 		}
 
