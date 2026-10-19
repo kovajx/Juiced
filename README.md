@@ -4,11 +4,11 @@ Client-Mod für PvP-Visuals und Cosmetics. Alles läuft nur auf deinem Client un
 
 **Version:** Minecraft 26.3 · Fabric Loader 0.19.5+ · Fabric API 0.162.0+26.3 · Java 25
 
-## Module (49 Karten)
+## Module (49 Sender)
 
-Zusammengehörige Sachen liegen auf einer gemeinsamen Karte. Auf der Rückseite wählst du die Art oder schaltest die Teile einzeln an.
+Zusammengehörige Sachen liegen auf einem gemeinsamen Sender. In seinen Einstellungen wählst du die Art oder schaltest die Teile einzeln an.
 
-| Kategorie | Karten |
+| Kategorie | Sender |
 |---|---|
 | **Combat** | Treffer (Effekte + Hit-Sounds) · Kill-Effekte · Target-Marker · Totem-Pops · Rückstoß-Komet |
 | **Visuals** | Schadenszahlen (3D) · Jump Circles · Trails (dein Trail + Projektile) · Block-Umrandung · Fadenkreuz · Bildeffekte (Sättigung, Motion Blur) · Fußspuren (Leuchtend, Wasserringe, Blumen, Pfoten, Wolken) · Atmosphäre (Glühwürmchen, Laternen, Schmetterlinge, Sternschnuppen, Pusteblumen, Kirschblüten, Herbstlaub, Lavendel, Rosen, Schnee …) · Koi-Teich · Himmel (Polarlicht, Sternbilder, Vogelschwärme) · Umgebung (Zen-Garten, Regen & Pfützen, Atemwolken, Lichter & Lagerfeuer, Jukebox-Noten, Fallende Blätter, Sonnenstrahlen, Wassertropfen) · Angel-Moment |
@@ -17,11 +17,11 @@ Zusammengehörige Sachen liegen auf einer gemeinsamen Karte. Auf der Rückseite 
 | **HUD** | Target-HUD · Keystrokes + CPS · Info (FPS, Ping, XYZ, Richtung, Tempo, Uhr, Server) · Rüstungs-HUD · Effekt-HUD · Item-Zähler · Cooldowns · Totem-Warnung · Reach · Session-Stats · Kompass · Angriffs-Anzeige · Low-HP-Warnung |
 | **System** | Theme (Farben, HUD-Hintergrund) · Leistung |
 
-**Suche:** Einfach im Menü lostippen. Gefunden wird auch alles, was auf einer Karte steckt, z. B. „low fire“, „qualle“ oder „laternen“.
+**Suche:** Einfach im Menü lostippen. Gefunden wird auch alles, was in einem Sender steckt, z. B. „low fire“, „qualle“ oder „laternen“.
 
 ## Garderobe
 
-Im Menü oben rechts auf **„♛ Garderobe“**:
+Im Menü oben links auf **„Garderobe“** (oder **Strg+G**):
 - Du stehst in der Mitte und drehst dich selbst: **Ziehen**, **A / D** gedrückt halten oder die Pfeile über dir (je 45°). „Vorne“ schaut dich wieder von vorn an, das **Mausrad** zoomt. „Auto-Drehen“ ist aus, bis du es einschaltest.
 - Links die Slots: Kopf, Ohren, Rücken, Schweif, Begleiter, Klingen, Aura. Rechts wählst du, was du trägst, und stellst Farbe, Größe usw. ein.
 - **↑ ↓** wechselt den Slot, **← →** blättert durch die Teile.
@@ -99,20 +99,27 @@ Die gleiche Sperrliste haben auch **Fullbright** und **Flugbahn** (dort ist sie 
 
 ## HUD bearbeiten
 
-Im Menü oben rechts auf **„✛ HUD bearbeiten“**:
+Im Menü oben links auf **„HUD-Editor“** (oder **Strg+H**):
 - **Ziehen** verschiebt ein Element. Es rastet an Bildschirmrändern, der Mitte und anderen Elementen ein (Shift halten = frei).
 - **Mausrad** über einem Element ändert die Größe, **Rechtsklick** setzt es zurück, **Pfeiltasten** schieben pixelgenau (Shift = 10 px).
 - Links ist eine Liste aller HUD-Elemente zum direkten An- und Ausschalten.
 - Positionen werden relativ zum Bildschirmrand gespeichert, sie passen also bei jeder Fenstergröße.
 
-## Das Menü ("Deck")
+## Das Menü: Weltprobe
 
-- **Rechte Shift-Taste** öffnet das Menü (änderbar unter Optionen → Steuerung → Juiced).
-- Module sind Karten. **← →**, Mausrad oder Klick auf eine Seitenkarte blättert.
-- **Klick auf die Karte** schaltet das Modul an/aus. **⚙** dreht die Karte um und zeigt die Einstellungen.
-- **Einfach lostippen** sucht über alle Module. **↑ ↓** wechselt die Kategorie.
-- Bei Cosmetics schaltet die Kamera automatisch auf die Vorderansicht, damit du die Cosmetics live an dir siehst.
-- **ESC** dreht die Karte zurück, leert die Suche oder schließt das Menü.
+Das Menü ist eine Fernbedienung, deine Welt ist das Programm. Jedes Modul ist ein Sender und läuft beim Durchschalten sofort echt um dich herum, auch wenn es aus ist. So probierst du es aus, bevor du es anschaltest.
+
+- **Rechte Shift-Taste** öffnet und schließt das Menü (änderbar unter Optionen → Steuerung → Juiced). Die Kamera fährt dabei aus deiner Sicht heraus, sodass du dich von vorne siehst; beim Schließen fährt sie zurück.
+- **Mausrad** oder **← →** schaltet zum nächsten Sender. Unten liegt die **Senderskala** mit allen 49 Modulen als Lämpchen: Was leuchtet, ist an. Ein Klick auf ein Lämpchen springt dorthin, **Shift+Klick** schaltet es direkt an oder aus, **Rechtsklick** öffnet seine Einstellungen.
+- **Leertaste** (oder der Schalter auf der Karte) schaltet den Sender an oder aus. **Strg+Z** nimmt das zurück.
+- **↑ ↓** blättert live durch die Stile, zum Beispiel durch die Begleiter oder von Kirschblüten zu Schnee.
+- **Tab** öffnet die Einstellungen als Schublade an der Seite; jede Änderung siehst du sofort in der Welt.
+- **Einfach lostippen** sucht über alle Module, auch über einzelne Teile und Stile („low fire“, „kirsch“, „qualle“). **Enter** schaltet den Treffer an.
+- **1-6** springt zu Kampf, Optik, Tweaks, Kosmetik, HUD und System. **Backspace** springt zurück zum vorigen Sender.
+- Kampf-Effekte zeigt eine **Strohpuppe** neben dir, die alle gut eine Sekunde einen Treffer bekommt. Bei HUD-Sendern siehst du das Element an seinem Platz und kannst es direkt verschieben.
+- Was sich hier gerade nicht zeigen lässt (nachts, beim Angeln, ohne Wasser in der Nähe), läuft als kleine Vorschau mit dem Grund darunter.
+- **Strg+G** öffnet die Garderobe, **Strg+H** den HUD-Editor. **ESC** leert die Suche, schließt die Schublade oder das Menü.
+- Das alte Karten-Menü ("Deck") gibt es weiter: unter **System → Theme → Menü** auf „Deck“ stellen.
 
 ## Starten
 
@@ -126,7 +133,7 @@ Im Menü oben rechts auf **„✛ HUD bearbeiten“**:
 
 Am einfachsten: **`bauen-und-installieren.bat`** doppelklicken. Das baut die Mod und ersetzt die alte Juiced-Version im Modrinth-Profil „Fabric 26.3“.
 
-Von Hand: `gradlew.bat build` (Windows) oder `./gradlew build`. Die Mod liegt dann in `build/libs/juiced-2.7.0.jar`. Zusammen mit Fabric API in den `mods`-Ordner legen, und dort nur eine Juiced-Jar behalten.
+Von Hand: `gradlew.bat build` (Windows) oder `./gradlew build`. Die Mod liegt dann in `build/libs/juiced-2.8.0.jar`. Zusammen mit Fabric API in den `mods`-Ordner legen, und dort nur eine Juiced-Jar behalten.
 
 Auf GitHub baut **GitHub Actions** die Mod bei jedem Push. Die fertige Jar liegt beim jeweiligen Lauf unter „Artifacts“.
 
@@ -148,13 +155,14 @@ Auf GitHub baut **GitHub Actions** die Mod bei jedem Push. Die fertige Jar liegt
 | `render/Sparks` | Eigenes, sehr leichtes Partikelsystem |
 | `render/WorldFx` | Hängt die 3D-Effekte ins Welt-Rendering |
 | `modules/` | Alle Module, nach Kategorie sortiert |
-| `render/FreeCamera` | Freie Kamera für Freelook und die Garderobe (dreht nur die Kamera, nie den Spieler) |
+| `render/FreeCamera` | Freie Kamera für Freelook, die Garderobe und das Menü (dreht nur die Kamera, nie den Spieler) |
 | `render/NearbyBlocks` | Sucht alle zwei Sekunden Lagerfeuer, Kerzen, Laternen, Jukeboxen und Blätter in der Nähe |
 | `core/ModuleGroup` | Mehrere Module auf einer Karte (Kopf, Rücken, Atmosphäre, Himmel, Umgebung, Klare Sicht, Sanfte Oberfläche, Treffer, Trails) |
 | `core/ServerBlockList` | Server-Sperrliste für Module, die manche Server verbieten (Freelook, Fullbright, Flugbahn) |
 | `render/Sky` | Wie sehr gerade Tag oder Nacht ist, aus den Himmelswerten des Spiels |
 | `render/PostEffect` | Legt einen Shader aus `assets/juiced/post_effect` über das Bild (Bildeffekte) |
 | `MixinCheck` | Schreibt beim Start ins Log, wenn ein Mixin in dieser Minecraft-Version nichts mehr findet |
-| `gui/DeckScreen` | Das Menü |
+| `gui/weltprobe/` | Das Menü Weltprobe: Sender, Kamera-Einstellungen, Strohpuppe, Suche und die Bildschirmteile |
+| `gui/DeckScreen` | Das alte Karten-Menü |
 | `gui/WardrobeScreen` | Die Garderobe mit Outfits |
 | `gui/ColorPickerScreen` | Der Farbwähler |
