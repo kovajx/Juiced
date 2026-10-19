@@ -1,5 +1,7 @@
 package dev.juiced.modules.hud;
 
+import org.jspecify.annotations.Nullable;
+
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.player.LocalPlayer;
@@ -42,6 +44,7 @@ public final class ItemCounter extends HudModule {
 			new Entry(Items.ARROW, false)
 	};
 	private int visible;
+	private boolean counted;
 
 	public ItemCounter() {
 		super("item_counter", "Item-Zähler", false, 1f, 0.82f,
@@ -85,9 +88,29 @@ public final class ItemCounter extends HudModule {
 	public void tick(Minecraft minecraft) {
 		LocalPlayer player = minecraft.player;
 
-		if (player == null) {
-			return;
+		if (player != null) {
+			countAll(player);
 		}
+	}
+
+	@Override
+	protected void onDisable() {
+		counted = false;
+	}
+
+	@Override
+	public @Nullable String probeLiveReason(Minecraft minecraft) {
+		for (int i = 0; i < entries.length; i++) {
+			if (shown(i)) {
+				return null;
+			}
+		}
+
+		return "Keine Items ausgewählt";
+	}
+
+	private void countAll(LocalPlayer player) {
+		counted = true;
 
 		for (Entry entry : entries) {
 			entry.count = 0;
@@ -116,6 +139,12 @@ public final class ItemCounter extends HudModule {
 
 	@Override
 	protected boolean prepare(Hud hud, boolean editing) {
+		// Counts come from tick. A fresh try-out in the menu, or the editor showing it while it's off, counts here
+		// instead of showing old counts or zeros
+		if (editing && (!counted || !isEnabled()) && hud.minecraft.player != null) {
+			countAll(hud.minecraft.player);
+		}
+
 		visible = 0;
 
 		for (int i = 0; i < entries.length; i++) {

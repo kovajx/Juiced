@@ -94,6 +94,13 @@ public final class Cooldowns extends HudModule {
 		return !offhand.isEmpty() && offhand.is(item) ? offhand : null;
 	}
 
+	/** Forget what was cooling down, so a later try-out in the menu doesn't show a frozen cell from back then. */
+	@Override
+	protected void onDisable() {
+		active.clear();
+		started.clear();
+	}
+
 	@Override
 	protected boolean prepare(Hud hud, boolean editing) {
 		partial = hud.partialTick;

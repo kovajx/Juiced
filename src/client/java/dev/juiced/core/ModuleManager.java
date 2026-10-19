@@ -13,6 +13,7 @@ import dev.juiced.JuicedClient;
 import dev.juiced.modules.combat.HitEffects;
 import dev.juiced.modules.combat.HitSounds;
 import dev.juiced.modules.combat.KillEffects;
+import dev.juiced.modules.combat.KnockbackComet;
 import dev.juiced.modules.combat.TargetMarker;
 import dev.juiced.modules.combat.TotemPops;
 import dev.juiced.modules.cosmetic.Aura;
@@ -20,6 +21,7 @@ import dev.juiced.modules.cosmetic.Cape;
 import dev.juiced.modules.cosmetic.Ears;
 import dev.juiced.modules.cosmetic.FloatingBlades;
 import dev.juiced.modules.cosmetic.Pet;
+import dev.juiced.modules.cosmetic.ShadowPet;
 import dev.juiced.modules.cosmetic.Tail;
 import dev.juiced.modules.cosmetic.ConeHat;
 import dev.juiced.modules.cosmetic.Crown;
@@ -46,6 +48,7 @@ import dev.juiced.modules.tweaks.ExplosionTweaks;
 import dev.juiced.modules.tweaks.Freelook;
 import dev.juiced.modules.tweaks.Fullbright;
 import dev.juiced.modules.tweaks.HandView;
+import dev.juiced.modules.tweaks.HitDirection;
 import dev.juiced.modules.tweaks.LowFire;
 import dev.juiced.modules.tweaks.LowShield;
 import dev.juiced.modules.tweaks.ToggleSprint;
@@ -55,12 +58,15 @@ import dev.juiced.modules.tweaks.SmoothHotbar;
 import dev.juiced.modules.tweaks.ZenMode;
 import dev.juiced.modules.tweaks.Zoom;
 import dev.juiced.modules.visual.AmbientParticles;
+import dev.juiced.modules.visual.Aurora;
+import dev.juiced.modules.visual.BirdFlocks;
 import dev.juiced.modules.visual.BlockOutline;
 import dev.juiced.modules.visual.CustomCrosshair;
 import dev.juiced.modules.visual.DamageNumbers;
 import dev.juiced.modules.visual.Footprints;
 import dev.juiced.modules.visual.JumpCircles;
 import dev.juiced.modules.visual.BreathClouds;
+import dev.juiced.modules.visual.Constellations;
 import dev.juiced.modules.visual.CozyLights;
 import dev.juiced.modules.visual.FallingLeaves;
 import dev.juiced.modules.visual.FishingMoment;
@@ -71,6 +77,8 @@ import dev.juiced.modules.visual.ScreenDrops;
 import dev.juiced.modules.visual.ZenGarden;
 import dev.juiced.modules.visual.Petals;
 import dev.juiced.modules.visual.ProjectileTrails;
+import dev.juiced.modules.visual.ScreenEffects;
+import dev.juiced.modules.visual.SunRays;
 import dev.juiced.modules.visual.Trails;
 import dev.juiced.render.Geo;
 
@@ -96,6 +104,7 @@ public final class ModuleManager {
 		register(new KillEffects());
 		register(new TargetMarker());
 		register(new TotemPops());
+		register(new KnockbackComet());
 		// Visuals
 		register(new DamageNumbers());
 		register(new JumpCircles());
@@ -106,6 +115,7 @@ public final class ModuleManager {
 				.build());
 		register(new BlockOutline());
 		register(new CustomCrosshair());
+		register(new ScreenEffects());
 		register(new Footprints());
 		register(ModuleGroup.choice("ambient", "Atmosphäre", Category.VISUALS,
 				"Ruhige Stimmung um dich herum: Glühwürmchen, Laternen, Schmetterlinge, Kirschblüten, Herbstlaub, Lavendel, Rosen, Schnee, Sternschnuppen, Pusteblumen und mehr.")
@@ -114,26 +124,35 @@ public final class ModuleManager {
 				.styles("petals.", Petals::new, "style", "Kirschblüten", 0, "Herbstlaub", 1, "Lavendel", 2, "Rosen", 3, "Schnee", 4)
 				.build());
 		register(new KoiPond());
+		register(ModuleGroup.bundle("sky", "Himmel", Category.VISUALS, false,
+				"Ruhe am Himmel: nachts Polarlichter und Sternbilder, die langsam nachgezeichnet werden, tagsüber ziehen Vogelschwärme vorbei.")
+				.bundled("aurora.", Aurora::new, "Polarlicht", "aurora")
+				.bundled("stars.", Constellations::new, "Sternbilder", "constellations")
+				.bundled("birds.", BirdFlocks::new, "Vogelschwärme", "birds")
+				.build());
 		register(ModuleGroup.bundle("environment", "Umgebung", Category.VISUALS, true,
 				"Ruhige Natur um dich herum: geharkte Linien im Sand, Regenringe und Pfützen, Atemwolken in der Kälte, Funken über Lagerfeuern, "
-						+ "leuchtende Kerzen und Laternen, Noten aus Jukeboxen, fallende Blätter und Wassertropfen auf dem Bildschirm.")
+						+ "leuchtende Kerzen und Laternen, Noten aus Jukeboxen, fallende Blätter, Sonnenstrahlen durch die Bäume und Wassertropfen auf dem Bildschirm.")
 				.bundled("zen.", ZenGarden::new, "Zen-Garten", "zen_garden")
 				.bundled("rain.", RainRipples::new, "Regen & Pfützen", "rain")
 				.bundled("breath.", BreathClouds::new, "Atemwolken", "breath")
 				.bundled("lights.", CozyLights::new, "Lichter & Lagerfeuer", "lights")
 				.bundled("jukebox.", JukeboxNotes::new, "Jukebox-Noten", "jukebox")
 				.bundled("leaves.", FallingLeaves::new, "Fallende Blätter", "leaves")
+				.bundled("sun_rays.", SunRays::new, "Sonnenstrahlen", "sun_rays")
 				.bundled("drops.", ScreenDrops::new, "Wassertropfen", "drops")
 				.build());
 		register(new FishingMoment());
 		// Tweaks
 		register(new ExplosionTweaks());
 		register(ModuleGroup.bundle("clear_view", "Klare Sicht", Category.TWEAKS, true,
-				"Alles, was im Kampf die Sicht stört, an einem Ort: Overlays (Hurt-Cam, Totem, Kürbis, Portal, Wasser, Block), Low Fire, Low Shield und die Hand-Ansicht.")
+				"Alles, was im Kampf die Sicht stört, an einem Ort: Overlays (Hurt-Cam, Totem, Kürbis, Portal, Wasser, Block), Low Fire, Low Shield und die Hand-Ansicht. "
+						+ "Dazu zeigt ein Pinselbogen am Fadenkreuz, woher ein Treffer kam.")
 				.bundled("", ClearView::new, "Overlays ausblenden", "overlays")
 				.bundled("fire.", LowFire::new, "Low Fire", "low_fire")
 				.bundled("shield.", LowShield::new, "Low Shield", "low_shield")
 				.bundled("hand.", HandView::new, "Hand-Ansicht", "hand_view")
+				.bundled("hit_dir.", HitDirection::new, "Treffer-Richtung", "hit_direction")
 				.build());
 		register(new Trajectories());
 		register(new Zoom());
@@ -163,6 +182,7 @@ public final class ModuleManager {
 		register(new Ears());
 		register(new Tail());
 		register(new Pet());
+		register(new ShadowPet());
 		register(new FloatingBlades());
 		// HUD
 		register(new TargetHud());
@@ -307,7 +327,7 @@ public final class ModuleManager {
 	public static void clearEffects() {
 		for (Module module : MODULES) {
 			if (module.isEnabled()) {
-				module.onDisable();
+				module.clearEffects();
 			}
 		}
 	}

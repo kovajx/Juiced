@@ -1,5 +1,7 @@
 package dev.juiced.modules.visual;
 
+import org.jspecify.annotations.Nullable;
+
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -52,6 +54,21 @@ public final class BreathClouds extends Module {
 		BlockState below = level.getBlockState(feet.below());
 		return at.is(Blocks.SNOW) || at.is(Blocks.POWDER_SNOW) || below.is(Blocks.SNOW_BLOCK) || below.is(Blocks.SNOW) || below.is(Blocks.POWDER_SNOW)
 				|| below.is(Blocks.ICE) || below.is(Blocks.PACKED_ICE) || below.is(Blocks.BLUE_ICE);
+	}
+
+	@Override
+	public @Nullable String probeLiveReason(Minecraft minecraft) {
+		LocalPlayer player = minecraft.player;
+
+		if (player == null || minecraft.level == null) {
+			return null;
+		}
+
+		if (player.isUnderWater()) {
+			return "Nicht unter Wasser";
+		}
+
+		return when.index() == 1 || isCold(minecraft.level, player) ? null : "Nur auf Schnee und Eis";
 	}
 
 	@Override

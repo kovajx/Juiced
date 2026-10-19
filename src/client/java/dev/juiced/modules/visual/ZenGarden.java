@@ -1,5 +1,7 @@
 package dev.juiced.modules.visual;
 
+import org.jspecify.annotations.Nullable;
+
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -56,6 +58,8 @@ public final class ZenGarden extends Module {
 	private final byte[] circleMaterial = new byte[MAX_CIRCLES];
 	private int circleHead;
 	private boolean circleDone;
+	/** The menu's tick count at its last call, to notice when it tunes in again. */
+	private int probeTicks = Integer.MAX_VALUE;
 
 	public ZenGarden() {
 		super("zen_garden", "Zen-Garten", Category.VISUALS, true,
@@ -66,6 +70,45 @@ public final class ZenGarden extends Module {
 	protected void onDisable() {
 		java.util.Arrays.fill(born, 0);
 		java.util.Arrays.fill(circleBorn, 0);
+	}
+
+	/**
+	 * Rings form only once for each time you stand still. When the menu tunes in again while you still stand
+	 * there, the old rings make way and new ones form shortly after its camera has arrived.
+	 */
+	@Override
+	public void probeTick(Minecraft minecraft, int ticks) {
+		LocalPlayer player = minecraft.player;
+		boolean tunedIn = ticks <= probeTicks;
+		probeTicks = ticks;
+
+		if (!tunedIn || player == null) {
+			return;
+		}
+
+		for (int c = 0; c < MAX_CIRCLES; c++) {
+			double dx = circleX[c] - player.getX();
+			double dz = circleZ[c] - player.getZ();
+
+			if (dx * dx + dz * dz < 0.25) {
+				circleBorn[c] = 0;
+			}
+		}
+
+		circleDone = false;
+		stillSince = Clock.t() - 1.2;
+	}
+
+	@Override
+	public @Nullable String probeLiveReason(Minecraft minecraft) {
+		LocalPlayer player = minecraft.player;
+		ClientLevel level = minecraft.level;
+
+		if (player == null || level == null) {
+			return null;
+		}
+
+		return player.onGround() && materialAt(level, player.getX(), player.getY(), player.getZ()) >= 0 ? null : "Nur auf Sand oder Kies";
 	}
 
 	/** -1 if the block under you isn't raked, otherwise the material (sand, red sand, gravel). */

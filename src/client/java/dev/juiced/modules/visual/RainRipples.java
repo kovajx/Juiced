@@ -2,6 +2,8 @@ package dev.juiced.modules.visual;
 
 import java.util.concurrent.ThreadLocalRandom;
 
+import org.jspecify.annotations.Nullable;
+
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -62,6 +64,11 @@ public final class RainRipples extends Module {
 	protected void onDisable() {
 		java.util.Arrays.fill(rBorn, 0);
 		java.util.Arrays.fill(pAlive, false);
+	}
+
+	@Override
+	public @Nullable String probeLiveReason(Minecraft minecraft) {
+		return raining ? null : "Nur bei Regen";
 	}
 
 	@Override

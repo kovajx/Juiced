@@ -1,8 +1,11 @@
 package dev.juiced.modules.tweaks;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import org.jspecify.annotations.Nullable;
 
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.ItemStack;
 
@@ -26,6 +29,19 @@ public final class HandView extends Module {
 		super("hand_view", "Hand-Ansicht", Category.TWEAKS, false,
 				"Mach Schwert, Kristalle und Co. in der Hand kleiner oder schieb sie zur Seite, für mehr Sicht.");
 		INSTANCE = this;
+	}
+
+	/** Only items are moved, not the bare hand, and at the default size and position nothing changes. */
+	@Override
+	public @Nullable String probeLiveReason(Minecraft minecraft) {
+		LocalPlayer player = minecraft.player;
+
+		if (player == null || player.isSpectator() || (player.getMainHandItem().isEmpty() && player.getOffhandItem().isEmpty())) {
+			return "Nur mit Item in der Hand";
+		}
+
+		boolean untouched = Math.abs(size.f() - 1f) < 0.001f && Math.abs(x.f()) < 0.001f && Math.abs(y.f()) < 0.001f && Math.abs(z.f()) < 0.001f;
+		return untouched ? "Regler verschieben" : null;
 	}
 
 	/**

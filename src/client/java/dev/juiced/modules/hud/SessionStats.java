@@ -46,7 +46,8 @@ public final class SessionStats extends HudModule {
 			lastLevel = minecraft.level;
 		}
 
-		if (minecraft.player != null && !minecraft.isPaused()) {
+		// A try-out in the menu is no session: count only while it is switched on
+		if (minecraft.player != null && !minecraft.isPaused() && isSwitchedOn()) {
 			playTicks++;
 		}
 	}
@@ -62,7 +63,7 @@ public final class SessionStats extends HudModule {
 
 	@Override
 	public void onKill(LivingEntity target) {
-		if (playersOnly.on() && !(target instanceof Player)) {
+		if (!isSwitchedOn() || (playersOnly.on() && !(target instanceof Player))) {
 			return;
 		}
 
@@ -73,13 +74,17 @@ public final class SessionStats extends HudModule {
 
 	@Override
 	public void onDeath() {
+		if (!isSwitchedOn()) {
+			return;
+		}
+
 		deaths++;
 		streak = 0;
 	}
 
 	@Override
 	public void onTotemPop(LivingEntity entity, int count) {
-		if (entity == Minecraft.getInstance().player) {
+		if (isSwitchedOn() && entity == Minecraft.getInstance().player) {
 			pops++;
 		}
 	}
@@ -87,21 +92,25 @@ public final class SessionStats extends HudModule {
 	@Override
 	protected boolean prepare(Hud hud, boolean editing) {
 		lines.clear();
-		String kd = deaths == 0 ? String.valueOf(kills) : String.format("%.2f", kills / (float) deaths);
-		lines.add(new String[] {"Kills", String.valueOf(kills)});
-		lines.add(new String[] {"Tode", String.valueOf(deaths)});
+		// Never counted anything yet (a try-out in the menu, or the HUD editor): show what a session looks like
+		boolean sample = editing && kills == 0 && deaths == 0 && pops == 0 && playTicks == 0;
+		int k = sample ? 7 : kills;
+		int d = sample ? 3 : deaths;
+		String kd = d == 0 ? String.valueOf(k) : String.format("%.2f", k / (float) d);
+		lines.add(new String[] {"Kills", String.valueOf(k)});
+		lines.add(new String[] {"Tode", String.valueOf(d)});
 		lines.add(new String[] {"K/D", kd});
 
 		if (showStreak.on()) {
-			lines.add(new String[] {"Streak", streak + " (Best " + bestStreak + ")"});
+			lines.add(new String[] {"Streak", sample ? "2 (Best 4)" : streak + " (Best " + bestStreak + ")"});
 		}
 
 		if (showPops.on()) {
-			lines.add(new String[] {"Pops", String.valueOf(pops)});
+			lines.add(new String[] {"Pops", String.valueOf(sample ? 1 : pops)});
 		}
 
 		if (showTime.on()) {
-			long seconds = playTicks / 20;
+			long seconds = sample ? 47 * 60 + 12 : playTicks / 20;
 			lines.add(new String[] {"Zeit", String.format("%d:%02d:%02d", seconds / 3600, (seconds / 60) % 60, seconds % 60)});
 		}
 

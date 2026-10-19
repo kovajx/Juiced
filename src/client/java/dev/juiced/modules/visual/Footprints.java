@@ -3,11 +3,17 @@ package dev.juiced.modules.visual;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.jspecify.annotations.Nullable;
+
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.phys.shapes.VoxelShape;
 
 import dev.juiced.core.Category;
 import dev.juiced.core.Clock;
@@ -25,6 +31,9 @@ import dev.juiced.render.Gui2D;
 public final class Footprints extends Module {
 	private static final int CAPACITY = 96;
 	private static final double STRIDE = 0.62;
+	/** The menu walks you round a circle of this radius, one step every 7 ticks (a calm walk). */
+	private static final double PROBE_RADIUS = 1.3;
+	private static final int PROBE_STEP_TICKS = 7;
 
 	private final ChoiceSetting style = add(new ChoiceSetting("style", "Stil", 0, "Leuchtend", "Wasserringe", "Blumen", "Pfoten", "Wolken"));
 	private final ColorSetting color = add(new ColorSetting("color", "Farbe"));
@@ -39,6 +48,9 @@ public final class Footprints extends Module {
 	private final double[] born = new double[CAPACITY];
 	private int head;
 	private final Map<Integer, Walker> walkers = new HashMap<>();
+	private final BlockPos.MutableBlockPos groundPos = new BlockPos.MutableBlockPos();
+	private double probeAngle;
+	private boolean probeLeft;
 
 	public Footprints() {
 		super("footprints", "Fußspuren", Category.VISUALS, false,
@@ -90,14 +102,70 @@ public final class Footprints extends Module {
 		// Perpendicular to the walking direction
 		double px = -Math.sin(direction) * side;
 		double pz = Math.cos(direction) * side;
-		fx[head] = entity.getX() + px;
-		fy[head] = entity.getY() + 0.015;
-		fz[head] = entity.getZ() + pz;
+		print(entity.getX() + px, entity.getY() + 0.015, entity.getZ() + pz, direction);
+		walker.lastX = entity.getX();
+		walker.lastZ = entity.getZ();
+	}
+
+	private void print(double x, double y, double z, float direction) {
+		fx[head] = x;
+		fy[head] = y;
+		fz[head] = z;
 		yaw[head] = direction;
 		born[head] = Clock.t();
 		head = (head + 1) % CAPACITY;
-		walker.lastX = entity.getX();
-		walker.lastZ = entity.getZ();
+	}
+
+	/** You can't walk while the menu is open, so it leaves prints on a circle around you, like a slow walk round. */
+	@Override
+	public void probeTick(Minecraft minecraft, int ticks) {
+		LocalPlayer self = minecraft.player;
+		ClientLevel level = minecraft.level;
+
+		if (self == null || level == null || ticks % PROBE_STEP_TICKS != 0) {
+			return;
+		}
+
+		probeAngle += STRIDE / PROBE_RADIUS;
+		probeLeft = !probeLeft;
+		// Walking anticlockwise, so the tangent is a quarter turn on from the radius
+		float direction = (float) (probeAngle + Math.PI / 2);
+		double radius = PROBE_RADIUS + (probeLeft ? 0.14 : -0.14);
+		double x = self.getX() + Math.cos(probeAngle) * radius;
+		double z = self.getZ() + Math.sin(probeAngle) * radius;
+		double ground = groundAt(level, x, self.getY(), z);
+
+		// No print in the air or inside a wall, like a real step would never make one there
+		if (!Double.isNaN(ground)) {
+			print(x, ground + 0.015, z, direction);
+		}
+	}
+
+	/** Top of the ground at this spot if it is about level with your feet, else NaN. */
+	private double groundAt(ClientLevel level, double x, double feet, double z) {
+		int bx = (int) Math.floor(x);
+		int bz = (int) Math.floor(z);
+
+		for (int y = (int) Math.floor(feet + 0.5); y >= (int) Math.floor(feet) - 1; y--) {
+			groundPos.set(bx, y, bz);
+			VoxelShape shape = level.getBlockState(groundPos).getCollisionShape(level, groundPos);
+
+			if (shape.isEmpty()) {
+				continue;
+			}
+
+			double top = y + shape.max(Direction.Axis.Y);
+			return Math.abs(top - feet) <= 0.55 ? top : Double.NaN;
+		}
+
+		return Double.NaN;
+	}
+
+	/** The pretend walk needs ground under you; flying or swimming makes no prints. */
+	@Override
+	public @Nullable String probeLiveReason(Minecraft minecraft) {
+		LocalPlayer self = minecraft.player;
+		return self != null && (!self.onGround() || self.isInWater()) ? "Wirkt beim Laufen" : null;
 	}
 
 	@Override

@@ -135,7 +135,7 @@ public class WardrobeScreen extends Screen implements CameraKeeper {
 		for (Option option : slot.options) {
 			Module module = ModuleManager.byId(option.moduleId);
 
-			if (module == null || !module.isEnabled()) {
+			if (module == null || !module.isSwitchedOn()) {
 				continue;
 			}
 

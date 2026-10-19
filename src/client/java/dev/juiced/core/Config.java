@@ -2,8 +2,10 @@ package dev.juiced.core;
 
 import java.io.Reader;
 import java.io.Writer;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -36,61 +38,90 @@ public final class Config {
 			return;
 		}
 
+		JsonObject root;
+
 		try (Reader reader = Files.newBufferedReader(path)) {
-			JsonElement root = JsonParser.parseReader(reader);
+			JsonElement parsed = JsonParser.parseReader(reader);
 
-			if (!root.isJsonObject()) {
-				return;
+			if (!parsed.isJsonObject()) {
+				throw new IllegalStateException("not a JSON object");
 			}
 
-			JsonObject rootObject = root.getAsJsonObject();
-			Outfits.fromJson(rootObject.get("outfits"));
-			JsonElement recent = rootObject.get("recent_colors");
+			root = parsed.getAsJsonObject();
+		} catch (Exception e) {
+			// Keep the broken file, the next save would overwrite it with the defaults
+			Path backup = path.resolveSibling("juiced.json.broken");
+			JuicedClient.LOGGER.warn("Could not read {}, using defaults. The old file is kept as {}", path, backup.getFileName(), e);
 
-			if (recent != null && recent.isJsonArray()) {
-				Colors.RECENT.clear();
+			try {
+				Files.copy(path, backup, StandardCopyOption.REPLACE_EXISTING);
+			} catch (Exception copyError) {
+				JuicedClient.LOGGER.warn("Could not back up {}", path, copyError);
+			}
 
-				for (JsonElement color : recent.getAsJsonArray()) {
-					if (color.isJsonPrimitive() && Colors.RECENT.size() < 8) {
-						Colors.RECENT.add(color.getAsInt() & 0xFFFFFF);
-					}
+			return;
+		}
+
+		// Every part is read on its own, so one broken entry never loses the rest
+		try {
+			Outfits.fromJson(root.get("outfits"));
+		} catch (RuntimeException e) {
+			JuicedClient.LOGGER.warn("Ignoring broken outfits in {}", path, e);
+		}
+
+		JsonElement recent = root.get("recent_colors");
+
+		if (recent != null && recent.isJsonArray()) {
+			Colors.RECENT.clear();
+
+			for (JsonElement color : recent.getAsJsonArray()) {
+				if (color.isJsonPrimitive() && color.getAsJsonPrimitive().isNumber() && Colors.RECENT.size() < 8) {
+					Colors.RECENT.add(color.getAsInt() & 0xFFFFFF);
 				}
 			}
+		}
 
-			JsonObject modules = rootObject.getAsJsonObject("modules");
+		JsonObject modules = object(root, "modules");
 
-			if (modules == null) {
-				return;
+		if (modules == null) {
+			return;
+		}
+
+		for (Module module : ModuleManager.all()) {
+			JsonObject saved = object(modules, module.id);
+
+			if (saved == null) {
+				continue;
 			}
 
-			for (Module module : ModuleManager.all()) {
-				JsonObject saved = modules.getAsJsonObject(module.id);
-
-				if (saved == null) {
-					continue;
-				}
-
+			try {
 				JsonElement enabled = saved.get("enabled");
 
-				if (enabled != null && enabled.isJsonPrimitive()) {
+				if (enabled != null && enabled.isJsonPrimitive() && enabled.getAsJsonPrimitive().isBoolean()) {
 					module.setEnabled(enabled.getAsBoolean());
 				}
 
 				if (module instanceof HudModule hudModule) {
-					hudModule.positionFromJson(saved.getAsJsonObject("hud"));
+					hudModule.positionFromJson(object(saved, "hud"));
 				}
 
-				JsonObject settings = saved.getAsJsonObject("settings");
+				JsonObject settings = object(saved, "settings");
 
 				if (settings != null) {
 					for (Setting<?> setting : module.settings) {
 						setting.fromJson(settings.get(setting.id));
 					}
 				}
+			} catch (RuntimeException e) {
+				JuicedClient.LOGGER.warn("Ignoring broken settings of module {} in {}", module.id, path, e);
 			}
-		} catch (Exception e) {
-			JuicedClient.LOGGER.warn("Could not read {}, using defaults", path, e);
 		}
+	}
+
+	/** The child object called {@code key}, or null if it is missing or not an object. */
+	private static JsonObject object(JsonObject parent, String key) {
+		JsonElement element = parent.get(key);
+		return element != null && element.isJsonObject() ? element.getAsJsonObject() : null;
 	}
 
 	public static void save() {
@@ -98,7 +129,7 @@ public final class Config {
 
 		for (Module module : ModuleManager.all()) {
 			JsonObject saved = new JsonObject();
-			saved.addProperty("enabled", module.isEnabled());
+			saved.addProperty("enabled", module.isSwitchedOn());
 			JsonObject settings = new JsonObject();
 
 			for (Setting<?> setting : module.settings) {
@@ -128,12 +159,20 @@ public final class Config {
 
 		root.add("recent_colors", recent);
 		Path path = path();
+		Path temp = path.resolveSibling("juiced.json.tmp");
 
 		try {
 			Files.createDirectories(path.getParent());
 
-			try (Writer writer = Files.newBufferedWriter(path)) {
+			// Write next to the config first and swap it in, so a crash mid-save never leaves half a file
+			try (Writer writer = Files.newBufferedWriter(temp)) {
 				GSON.toJson(root, writer);
+			}
+
+			try {
+				Files.move(temp, path, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+			} catch (AtomicMoveNotSupportedException e) {
+				Files.move(temp, path, StandardCopyOption.REPLACE_EXISTING);
 			}
 		} catch (Exception e) {
 			JuicedClient.LOGGER.warn("Could not save {}", path, e);

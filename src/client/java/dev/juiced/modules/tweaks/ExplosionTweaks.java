@@ -1,5 +1,8 @@
 package dev.juiced.modules.tweaks;
 
+import org.jspecify.annotations.Nullable;
+
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.core.particles.ParticleOptions;
 import net.minecraft.core.particles.ParticleType;
@@ -31,6 +34,12 @@ public final class ExplosionTweaks extends Module {
 	/** Called from ClientPacketListenerMixin whenever the server reports an explosion. */
 	public static void onExplosion() {
 		lastExplosion = System.nanoTime();
+	}
+
+	/** What it does is a cloud that doesn't appear, which only shows when something explodes. */
+	@Override
+	public @Nullable String probeLiveReason(Minecraft minecraft) {
+		return "Wirkt bei Explosionen";
 	}
 
 	/** Called from ParticleEngineMixin for every particle the game wants to spawn. */

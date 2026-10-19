@@ -3,6 +3,8 @@ package dev.juiced.modules.combat;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.jspecify.annotations.Nullable;
+
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -56,6 +58,12 @@ public final class TotemPops extends Module {
 					.append(Component.literal("(" + count + ")").withStyle(ChatFormatting.GOLD));
 			self.sendSystemMessage(message);
 		}
+	}
+
+	/** Without the effect a pop only goes to the chat, and only for players, so the dummy would show nothing. */
+	@Override
+	public @Nullable String probeLiveReason(Minecraft minecraft) {
+		return effect.on() ? null : "Effekt ist ausgeschaltet";
 	}
 
 	@Override

@@ -183,7 +183,7 @@ public class DeckScreen extends Screen implements CameraKeeper {
 		}
 
 		module.toggle();
-		Fx.sound("ui.button.click", 0.3f, module.isEnabled() ? 1.4f : 0.8f);
+		Fx.sound("ui.button.click", 0.3f, module.isSwitchedOn() ? 1.4f : 0.8f);
 	}
 
 	private void updateCamera() {
@@ -419,7 +419,7 @@ public class DeckScreen extends Screen implements CameraKeeper {
 
 	private void drawFront(GuiGraphicsExtractor g, Module module, boolean interactive) {
 		int accent = Theme.accent();
-		boolean on = module.isEnabled();
+		boolean on = module.isSwitchedOn();
 		int w = cardW;
 		int h = cardH;
 

@@ -3,6 +3,7 @@ package dev.juiced.modules.hud;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 
 import dev.juiced.combat.CombatEvents;
+import dev.juiced.core.Clock;
 import dev.juiced.core.Colors;
 import dev.juiced.core.Hud;
 import dev.juiced.core.HudModule;
@@ -12,6 +13,8 @@ import dev.juiced.core.setting.SliderSetting;
 import dev.juiced.render.Gui2D;
 
 public final class ReachDisplay extends HudModule {
+	private static final float[] SAMPLES = {2.87f, 2.41f, 3.06f, 2.68f};
+
 	private final SliderSetting hideAfter = add(new SliderSetting("hide_after", "Ausblenden nach", 0, 10, 1, 3, v -> v == 0 ? "nie" : Math.round(v) + "s"));
 	private final BoolSetting colored = add(new BoolSetting("colored", "Farbig nach Distanz", true));
 
@@ -41,7 +44,8 @@ public final class ReachDisplay extends HudModule {
 
 	@Override
 	protected void draw(GuiGraphicsExtractor g, Hud hud, boolean editing) {
-		float reach = visible() ? CombatEvents.lastReach() : 2.87f;
+		// Sample: a new made-up hit every 1.6 s, so the colours by distance show too
+		float reach = visible() ? CombatEvents.lastReach() : SAMPLES[(int) (Clock.t() / 1.6) % SAMPLES.length];
 		Gui2D.panel(g, 0, 0, width, height);
 		int rgb = 0xFFFFFF;
 

@@ -9,7 +9,8 @@ import dev.juiced.core.Clock;
 
 /**
  * Lets the third-person camera look around independently of where the player faces.
- * Used by Freelook (look around while running) and the wardrobe (orbit around yourself).
+ * Used by Freelook (look around while running), the wardrobe (orbit around yourself) and the
+ * Weltprobe menu (camera shots of you and the sky; it can also turn the first-person view, see {@link #setEgo}).
  *
  * <p>Only the camera turns. The player's real rotation, and everything the server sees, stay unchanged.
  */
@@ -17,7 +18,8 @@ public final class FreeCamera {
 	public enum Owner {
 		FREELOOK,
 		WARDROBE,
-		ZEN
+		ZEN,
+		MENU
 	}
 
 	private static final float RETURN_SECONDS = 0.28f;
@@ -28,6 +30,8 @@ public final class FreeCamera {
 	private static float distance = 4f;
 	private static float invertY = 1f;
 	private static @Nullable CameraType previous;
+	// First person with the rotation still overridden (the menu looking up at the sky)
+	private static boolean ego;
 
 	// After letting go, the camera swings back to the player's view instead of snapping
 	private static boolean returning;
@@ -59,6 +63,7 @@ public final class FreeCamera {
 
 		owner = who;
 		returning = false;
+		ego = false;
 		yaw = startYaw;
 		pitch = clampPitch(startPitch);
 		distance = startDistance;
@@ -69,6 +74,27 @@ public final class FreeCamera {
 		}
 	}
 
+	/**
+	 * First person instead of third person, while the rotation stays overridden: the view turns without
+	 * turning the player. Only while someone owns the camera; {@link #start} and {@link #stop} clear it.
+	 */
+	public static void setEgo(boolean firstPerson) {
+		if (owner == null) {
+			return;
+		}
+
+		ego = firstPerson;
+		Minecraft.getInstance().options.setCameraType(wantedType());
+	}
+
+	public static boolean ego() {
+		return owner != null && ego;
+	}
+
+	private static CameraType wantedType() {
+		return ego ? CameraType.FIRST_PERSON : CameraType.THIRD_PERSON_BACK;
+	}
+
 	/** Gives the camera back. With {@code smooth} it swings back to the player's view first. */
 	public static void stop(Owner who, boolean smooth) {
 		if (owner != who) {
@@ -76,6 +102,7 @@ public final class FreeCamera {
 		}
 
 		owner = null;
+		ego = false;
 
 		if (smooth) {
 			returning = true;
@@ -89,6 +116,7 @@ public final class FreeCamera {
 	public static void reset() {
 		if (owner != null || returning) {
 			owner = null;
+			ego = false;
 			finish();
 		}
 	}
@@ -111,6 +139,11 @@ public final class FreeCamera {
 
 	public static void setDistance(float newDistance) {
 		distance = Math.max(1f, Math.min(12f, newDistance));
+	}
+
+	/** Like {@link #setDistance}, but lets the camera come right up to the eyes (for gliding into first person). */
+	public static void setDistanceFree(float newDistance) {
+		distance = Math.max(0.05f, Math.min(12f, newDistance));
 	}
 
 	public static void setInvert(boolean invert) {
@@ -143,8 +176,8 @@ public final class FreeCamera {
 			Minecraft minecraft = Minecraft.getInstance();
 
 			// F5 while looking around would otherwise put the camera in front of the player
-			if (minecraft.options.getCameraType() != CameraType.THIRD_PERSON_BACK) {
-				minecraft.options.setCameraType(CameraType.THIRD_PERSON_BACK);
+			if (minecraft.options.getCameraType() != wantedType()) {
+				minecraft.options.setCameraType(wantedType());
 			}
 		} else if (returning) {
 			if (returnProgress >= 1f) {

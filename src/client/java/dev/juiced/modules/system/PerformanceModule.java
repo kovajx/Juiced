@@ -1,5 +1,8 @@
 package dev.juiced.modules.system;
 
+import org.jspecify.annotations.Nullable;
+
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 
 import dev.juiced.core.Category;
@@ -24,6 +27,12 @@ public final class PerformanceModule extends Module {
 	@Override
 	public boolean alwaysOn() {
 		return true;
+	}
+
+	/** It draws nothing itself; it only changes how much the other effects draw. */
+	@Override
+	public @Nullable String probeLiveReason(Minecraft minecraft) {
+		return "Wirkt auf alle Effekte";
 	}
 
 	@Override

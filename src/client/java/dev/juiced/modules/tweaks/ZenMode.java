@@ -1,5 +1,7 @@
 package dev.juiced.modules.tweaks;
 
+import org.jspecify.annotations.Nullable;
+
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Options;
@@ -165,6 +167,21 @@ public final class ZenMode extends Module {
 		if (active) {
 			wake();
 		}
+	}
+
+	/**
+	 * The menu shows Zen with its own camera in front of you (body yaw + 215, pitch 14, 4.2 blocks). Zen itself
+	 * stays asleep in the menu: an open screen counts as activity, and it never takes a camera someone else holds.
+	 */
+	@Override
+	public @Nullable String probeLiveReason(Minecraft minecraft) {
+		LocalPlayer player = minecraft.player;
+
+		if (player == null || !Freelook.cameraFits(minecraft, player.yBodyRot + 215f, 14f, 4.2f)) {
+			return "Hier kein Platz zum Kreisen";
+		}
+
+		return null;
 	}
 
 	@Override

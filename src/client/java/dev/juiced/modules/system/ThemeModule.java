@@ -1,5 +1,8 @@
 package dev.juiced.modules.system;
 
+import org.jspecify.annotations.Nullable;
+
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 
 import dev.juiced.core.Category;
@@ -7,6 +10,7 @@ import dev.juiced.core.Colors;
 import dev.juiced.core.Module;
 import dev.juiced.core.Theme;
 import dev.juiced.core.setting.BoolSetting;
+import dev.juiced.core.setting.ChoiceSetting;
 import dev.juiced.core.setting.ColorSetting;
 import dev.juiced.core.setting.SliderSetting;
 import dev.juiced.render.Gui2D;
@@ -18,6 +22,10 @@ public final class ThemeModule extends Module {
 	public final SliderSetting rainbowSpeed = SliderSetting.percent("rainbow_speed", "Regenbogen-Tempo", 0.1, 2.0, 0.5);
 	public final SliderSetting hudBackground = SliderSetting.percent("hud_background", "HUD-Hintergrund", 0.0, 1.0, 0.55);
 	public final BoolSetting hudAccent = new BoolSetting("hud_accent", "HUD-Farbstreifen", true);
+	/** Which Shift menu opens: the Weltprobe (index 0) or the older card deck. */
+	public final ChoiceSetting menuStyle = new ChoiceSetting("menu_style", "Menü", 0, "Weltprobe", "Deck");
+	/** How often the Weltprobe menu has been opened; its little help bubble shows the first few times. Hidden. */
+	public final SliderSetting menuOpens = new SliderSetting("menu_opens", "Menü geöffnet", 0, 99, 1, 0, v -> Integer.toString((int) Math.round(v)));
 
 	public ThemeModule() {
 		super("theme", "Theme", Category.SYSTEM, true,
@@ -25,11 +33,19 @@ public final class ThemeModule extends Module {
 		add(rainbowSpeed);
 		add(hudBackground);
 		add(hudAccent);
+		add(menuStyle);
+		add(menuOpens).showIf(() -> false);
 	}
 
 	@Override
 	public boolean alwaysOn() {
 		return true;
+	}
+
+	/** Nothing of its own in the world: the menu around it changes colour, and the card shows the gradient. */
+	@Override
+	public @Nullable String probeLiveReason(Minecraft minecraft) {
+		return "Färbt Menü und Effekte";
 	}
 
 	@Override

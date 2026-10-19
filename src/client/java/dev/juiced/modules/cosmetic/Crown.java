@@ -10,6 +10,7 @@ import dev.juiced.core.setting.ColorSetting;
 import dev.juiced.core.setting.SliderSetting;
 import dev.juiced.render.Geo;
 import dev.juiced.render.Gui2D;
+import dev.juiced.render.Pose3;
 
 public final class Crown extends CosmeticModule {
 	private static final int POINTS = 10;
@@ -28,41 +29,63 @@ public final class Crown extends CosmeticModule {
 		float s = size.f();
 		float radius = 0.27f * s;
 		float band = 0.07f * s;
-		double y0 = py + height - 0.05;
-		float start = (float) Math.toRadians(headYaw);
+		// Rests on the top of the head and tilts with it
+		Pose3 crown = headPose().move(0, HEAD_TOP + 0.005, 0);
 		int rgb = color.rgb();
+		int side = Colors.argb(0.97f, Colors.shade(rgb, -0.1f));
 		int dark = Colors.argb(0.97f, Colors.shade(rgb, -0.25f));
 		int light = Colors.argb(0.97f, Colors.shade(rgb, 0.2f));
 		int tip = Colors.argb(0.97f, Colors.shade(rgb, 0.45f));
-
-		geo.wall(px, y0, pz, radius, band, POINTS * 2, start, t -> Colors.shade(rgb, -0.1f), 0.97f, 0.97f);
-
+		float cx = geo.rx(crown.x);
+		float cy = geo.ry(crown.y);
+		float cz = geo.rz(crown.z);
+		// The band's height along the head's up axis
+		float hx = crown.ux * band;
+		float hy = crown.uy * band;
+		float hz = crown.uz * band;
 		float step = (float) (Math.PI * 2 / POINTS);
-		float cx = geo.rx(px);
-		float cz = geo.rz(pz);
-		float top = geo.ry(y0 + band);
 		float time = Clock.tf();
+		float x0 = cx + crown.rx * radius;
+		float y0 = cy + crown.ry * radius;
+		float z0 = cz + crown.rz * radius;
 
 		for (int i = 0; i < POINTS; i++) {
-			float a0 = start + i * step;
-			float a1 = a0 + step;
-			float am = (a0 + a1) / 2f;
+			float am = (i + 0.5f) * step;
+			float a1 = (i + 1) * step;
+			float cm = (float) Math.cos(am);
+			float sm = (float) Math.sin(am);
+			float c1 = (float) Math.cos(a1) * radius;
+			float s1 = (float) Math.sin(a1) * radius;
+			// Points on the band's bottom edge: middle of this spike and its far end
+			float xm = cx + (crown.rx * cm + crown.fx * sm) * radius;
+			float ym = cy + (crown.ry * cm + crown.fy * sm) * radius;
+			float zm = cz + (crown.rz * cm + crown.fz * sm) * radius;
+			float x1 = cx + crown.rx * c1 + crown.fx * s1;
+			float y1 = cy + crown.ry * c1 + crown.fy * s1;
+			float z1 = cz + crown.rz * c1 + crown.fz * s1;
+			geo.quad(x0, y0, z0, side, xm, ym, zm, side, xm + hx, ym + hy, zm + hz, side, x0 + hx, y0 + hy, z0 + hz, side);
+			geo.quad(xm, ym, zm, side, x1, y1, z1, side, x1 + hx, y1 + hy, z1 + hz, side, xm + hx, ym + hy, zm + hz, side);
+
+			// Spike tips lean out a little
 			float spike = (i % 2 == 0 ? 0.14f : 0.08f) * s;
-			float x0 = cx + (float) Math.cos(a0) * radius;
-			float z0 = cz + (float) Math.sin(a0) * radius;
-			float x1 = cx + (float) Math.cos(a1) * radius;
-			float z1 = cz + (float) Math.sin(a1) * radius;
-			float xm = cx + (float) Math.cos(am) * radius * 1.04f;
-			float zm = cz + (float) Math.sin(am) * radius * 1.04f;
-			geo.tri(x0, top, z0, dark, x1, top, z1, light, xm, top + spike, zm, tip);
+			float tx = cx + (xm - cx) * 1.04f + crown.ux * (band + spike);
+			float ty = cy + (ym - cy) * 1.04f + crown.uy * (band + spike);
+			float tz = cz + (zm - cz) * 1.04f + crown.uz * (band + spike);
+			geo.tri(x0 + hx, y0 + hy, z0 + hz, dark, x1 + hx, y1 + hy, z1 + hz, light, tx, ty, tz, tip);
 
 			if (gems.on() && i % 2 == 0) {
-				double gx = px + Math.cos(am) * radius * 1.05;
-				double gz = pz + Math.sin(am) * radius * 1.05;
 				float twinkle = 0.6f + 0.4f * (float) Math.sin(time * 3 + i);
-				geo.glowDot(gx, y0 + band + spike, gz, 0.035f * s, gemColor.rgb(i / (float) POINTS), twinkle);
-				geo.glowDot(px + Math.cos(am) * radius * 1.02, y0 + band * 0.5, pz + Math.sin(am) * radius * 1.02, 0.025f * s, gemColor.rgb(), 0.9f);
+				double gr = radius * 1.05;
+				geo.glowDot(crown.wx(cm * gr, band + spike, sm * gr), crown.wy(cm * gr, band + spike, sm * gr), crown.wz(cm * gr, band + spike, sm * gr),
+						0.035f * s, gemColor.rgb(i / (float) POINTS), twinkle);
+				double br = radius * 1.02;
+				geo.glowDot(crown.wx(cm * br, band * 0.5, sm * br), crown.wy(cm * br, band * 0.5, sm * br), crown.wz(cm * br, band * 0.5, sm * br),
+						0.025f * s, gemColor.rgb(), 0.9f);
 			}
+
+			x0 = x1;
+			y0 = y1;
+			z0 = z1;
 		}
 	}
 

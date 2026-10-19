@@ -17,7 +17,9 @@ import net.fabricmc.fabric.api.event.player.AttackEntityCallback;
 import dev.juiced.combat.CombatEvents;
 import dev.juiced.core.Config;
 import dev.juiced.core.ModuleManager;
+import dev.juiced.core.Theme;
 import dev.juiced.gui.DeckScreen;
+import dev.juiced.gui.weltprobe.WeltprobeScreen;
 import dev.juiced.modules.visual.CustomCrosshair;
 import dev.juiced.render.FreeCamera;
 import dev.juiced.render.JuicedHud;
@@ -53,7 +55,7 @@ public class JuicedClient implements ClientModInitializer {
 		ClientTickEvents.END_CLIENT_TICK.register(minecraft -> {
 			while (MENU_KEY.consumeClick()) {
 				if (minecraft.gui.screen() == null) {
-					minecraft.gui.setScreen(new DeckScreen());
+					minecraft.gui.setScreen(Theme.classicMenu() ? new DeckScreen() : new WeltprobeScreen());
 				}
 			}
 

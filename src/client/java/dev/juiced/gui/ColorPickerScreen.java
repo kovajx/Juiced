@@ -203,7 +203,21 @@ public class ColorPickerScreen extends Screen {
 
 	@Override
 	public void extractBackground(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+		// The menu behind keeps showing its live try-out (HUD element, crosshair) while you pick
+		if (parent instanceof CameraKeeper keeper) {
+			keeper.drawBehind(g, partialTick);
+		}
+
 		Gui2D.fill(g, 0, 0, this.width, this.height, 0x30000000);
+	}
+
+	@Override
+	public void tick() {
+		super.tick();
+
+		if (parent instanceof CameraKeeper keeper) {
+			keeper.tickBehind();
+		}
 	}
 
 	@Override
@@ -528,6 +542,13 @@ public class ColorPickerScreen extends Screen {
 		}
 
 		return true;
+	}
+
+	@Override
+	public boolean isPauseScreen() {
+		// Pause only if the screen below does: over the wardrobe and the Weltprobe menu the live preview behind
+		// the panel has to keep moving
+		return parent.isPauseScreen();
 	}
 
 	@Override

@@ -10,6 +10,7 @@ import dev.juiced.core.setting.ColorSetting;
 import dev.juiced.core.setting.SliderSetting;
 import dev.juiced.render.Geo;
 import dev.juiced.render.Gui2D;
+import dev.juiced.render.Pose3;
 
 public final class Halo extends CosmeticModule {
 	private final ColorSetting color = add(new ColorSetting("color", "Farbe"));
@@ -26,15 +27,19 @@ public final class Halo extends CosmeticModule {
 	protected void draw(Geo geo) {
 		float time = Clock.tf();
 		float s = size.f();
-		double y = py + height + 0.22 + (bob.on() ? 0.035 * Math.sin(time * 2.2) : 0);
+		// Floats level over the head and follows it when it turns, tilts or ducks
+		Pose3 above = aboveHead();
+		double x = above.x;
+		double y = above.y + 0.12 + (bob.on() ? 0.035 * Math.sin(time * 2.2) : 0);
+		double z = above.z;
 		float radius = 0.28f * s;
-		geo.groundRing(px, y, pz, radius, 0.04f * s, 0.09f * glow.f() * s, Theme.detail(48), time * 0.6f, (float) (Math.PI * 2), t -> color.rgb(t + time * 0.1f), 0.95f);
+		geo.groundRing(x, y, z, radius, 0.04f * s, 0.09f * glow.f() * s, Theme.detail(48), time * 0.6f, (float) (Math.PI * 2), t -> color.rgb(t + time * 0.1f), 0.95f);
 
 		if (sparkles.on()) {
 			for (int k = 0; k < 3; k++) {
 				double a = time * 1.2 + k * Math.PI * 2 / 3;
 				float twinkle = 0.4f + 0.6f * Math.max(0f, (float) Math.sin(time * 4 + k * 2));
-				geo.star(px + Math.cos(a) * radius, y, pz + Math.sin(a) * radius, 0.06f * s, time * 2 + k, color.rgb(k / 3f), twinkle);
+				geo.star(x + Math.cos(a) * radius, y, z + Math.sin(a) * radius, 0.06f * s, time * 2 + k, color.rgb(k / 3f), twinkle);
 			}
 		}
 	}

@@ -5,6 +5,7 @@ import java.util.List;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.world.entity.Entity;
 
 import dev.juiced.combat.CombatEvents;
@@ -23,6 +24,8 @@ import dev.juiced.render.Gui2D;
 public final class JumpCircles extends Module {
 	private static final int MAX_CIRCLES = 24;
 	private static final float FULL = (float) (Math.PI * 2);
+	/** Ticks between the menu's pretend jumps: one ring has faded before the next one starts. */
+	private static final int PROBE_PERIOD = 28;
 
 	private final ChoiceSetting style = add(new ChoiceSetting("style", "Stil", 0, "Ring", "Doppelring", "Welle", "Scheibe"));
 	private final ColorSetting color = add(new ColorSetting("color", "Farbe"));
@@ -54,6 +57,25 @@ public final class JumpCircles extends Module {
 	public void onLand(Entity entity, float fallHeight) {
 		if (landing.on() && fallHeight > 0.6f && (entity == Minecraft.getInstance().player || others.on())) {
 			add(entity, Math.min(2f, 0.6f + fallHeight * 0.15f));
+		}
+	}
+
+	/** You can't jump while the menu is open, so it jumps for you: a ring every 1.4 s, and a landing ring after it if wanted. */
+	@Override
+	public void probeTick(Minecraft minecraft, int ticks) {
+		LocalPlayer self = minecraft.player;
+
+		if (self == null) {
+			return;
+		}
+
+		int beat = ticks % PROBE_PERIOD;
+
+		if (beat == 2) {
+			onJump(self);
+		} else if (beat == 11) {
+			// Landing as if from a fall of a block and a half
+			onLand(self, 1.5f);
 		}
 	}
 

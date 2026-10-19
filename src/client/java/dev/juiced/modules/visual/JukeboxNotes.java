@@ -1,5 +1,7 @@
 package dev.juiced.modules.visual;
 
+import org.jspecify.annotations.Nullable;
+
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 
@@ -25,6 +27,12 @@ public final class JukeboxNotes extends Module {
 	@Override
 	public void tick(Minecraft minecraft) {
 		dev.juiced.render.NearbyBlocks.update(minecraft);
+	}
+
+	/** Only a jukebox with a record in it counts. */
+	@Override
+	public @Nullable String probeLiveReason(Minecraft minecraft) {
+		return dev.juiced.render.NearbyBlocks.count(dev.juiced.render.NearbyBlocks.JUKEBOX) > 0 ? null : "Braucht laufende Jukebox";
 	}
 
 	@Override

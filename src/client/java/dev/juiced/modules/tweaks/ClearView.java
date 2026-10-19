@@ -1,6 +1,10 @@
 package dev.juiced.modules.tweaks;
 
+import org.jspecify.annotations.Nullable;
+
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 
@@ -54,6 +58,16 @@ public final class ClearView extends Module {
 
 	public static boolean noInBlock() {
 		return INSTANCE != null && on(INSTANCE.inBlock);
+	}
+
+	/**
+	 * Hurt cam, totem, block and portal need a fight or a mishap, and the pumpkin overlay is part of the HUD the
+	 * menu hides. Only the water overlay can disappear in front of you, with your eyes under water.
+	 */
+	@Override
+	public @Nullable String probeLiveReason(Minecraft minecraft) {
+		LocalPlayer player = minecraft.player;
+		return water.on() && player != null && player.isUnderWater() ? null : "Wirkt im Kampf";
 	}
 
 	@Override

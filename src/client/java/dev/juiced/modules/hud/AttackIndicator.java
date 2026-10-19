@@ -1,5 +1,6 @@
 package dev.juiced.modules.hud;
 
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.player.LocalPlayer;
 
@@ -7,6 +8,7 @@ import dev.juiced.core.Category;
 import dev.juiced.core.Clock;
 import dev.juiced.core.Colors;
 import dev.juiced.core.Hud;
+import dev.juiced.core.MenuState;
 import dev.juiced.core.Module;
 import dev.juiced.core.Theme;
 import dev.juiced.core.setting.BoolSetting;
@@ -16,6 +18,11 @@ import dev.juiced.render.Gui2D;
 
 public final class AttackIndicator extends Module {
 	private static final int DOTS = 28;
+	/** A gap in the menu's probe ticks longer than this means the menu stopped showing the indicator. */
+	private static final double PROBE_GRACE = 0.25;
+	/** The menu's made-up swings: one every 1.4 s, recharged after 0.9 s. */
+	private static final double DEMO_SECONDS = 1.4;
+	private static final float DEMO_CHARGE = 0.9f;
 
 	private final ChoiceSetting style = add(new ChoiceSetting("style", "Stil", 0, "Ring", "Balken"));
 	private final SliderSetting size = add(SliderSetting.percent("size", "Größe", 0.7, 1.6, 1.0));
@@ -24,10 +31,33 @@ public final class AttackIndicator extends Module {
 
 	private boolean wasReady = true;
 	private double readyAt = -10;
+	private double probeSeen = -10;
+	private double probeStart;
+	private boolean demoLastFrame;
 
 	public AttackIndicator() {
 		super("attack_indicator", "Angriffs-Anzeige", Category.HUD, false,
 				"Ring ums Fadenkreuz, der sich mit deiner Schlagkraft füllt und aufblitzt, wenn der volle Schlag bereit ist.");
+	}
+
+	/**
+	 * You can't swing while the menu is open, so while it shows the indicator the ring acts out a swing every
+	 * 1.4 s: it empties, fills up and flashes. Your real attack timer is never touched.
+	 */
+	@Override
+	public void probeTick(Minecraft minecraft, int ticks) {
+		double now = Clock.t();
+
+		if (now - probeSeen > PROBE_GRACE) {
+			probeStart = now;
+		}
+
+		probeSeen = now;
+	}
+
+	/** True while the menu shows this module; ends at once when the menu closes and gives the HUD back. */
+	private boolean probeShown() {
+		return MenuState.hidesHud() && Clock.t() - probeSeen <= PROBE_GRACE;
 	}
 
 	@Override
@@ -39,6 +69,25 @@ public final class AttackIndicator extends Module {
 		}
 
 		float strength = Colors.clamp01(player.getAttackStrengthScale(0f));
+		boolean demo = probeShown();
+
+		if (demo != demoLastFrame) {
+			// Starting or ending the demo is no real swing, so no flash for it
+			demoLastFrame = demo;
+			wasReady = true;
+			readyAt = -10;
+		}
+
+		if (demo) {
+			// The menu hides the crosshair, and the ring sits around it
+			Gui2D.fill(g, hud.centerX() - 4, hud.centerY(), hud.centerX() + 5, hud.centerY() + 1, 0x99FFFFFF);
+			Gui2D.fill(g, hud.centerX(), hud.centerY() - 4, hud.centerX() + 1, hud.centerY() + 5, 0x99FFFFFF);
+
+			if (strength >= 1f) {
+				strength = Colors.clamp01((float) ((Clock.t() - probeStart) % DEMO_SECONDS) / DEMO_CHARGE);
+			}
+		}
+
 		boolean ready = strength >= 1f;
 		double now = Clock.t();
 

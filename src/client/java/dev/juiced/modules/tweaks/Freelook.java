@@ -7,22 +7,24 @@ import org.jspecify.annotations.Nullable;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.multiplayer.ServerData;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.world.level.ClipContext;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec3;
 
 import dev.juiced.JuicedClient;
 import dev.juiced.core.Category;
 import dev.juiced.core.Clock;
 import dev.juiced.core.Colors;
-import dev.juiced.core.Config;
 import dev.juiced.core.Hud;
 import dev.juiced.core.Module;
+import dev.juiced.core.ServerBlockList;
 import dev.juiced.core.Theme;
 import dev.juiced.core.setting.BoolSetting;
-import dev.juiced.core.setting.ButtonSetting;
 import dev.juiced.core.setting.ChoiceSetting;
 import dev.juiced.core.setting.SliderSetting;
-import dev.juiced.core.setting.StringListSetting;
 import dev.juiced.render.FreeCamera;
 import dev.juiced.render.Gui2D;
 
@@ -38,9 +40,7 @@ public final class Freelook extends Module {
 	private final BoolSetting scroll = add(new BoolSetting("scroll", "Mausrad ändert Abstand", true));
 	private final BoolSetting invert = add(new BoolSetting("invert", "Maus invertieren", false));
 	private final BoolSetting smoothReturn = add(new BoolSetting("smooth_return", "Weich zurückschwenken", true));
-	private final StringListSetting blocked = add(new StringListSetting("blocked_servers", List.of("hypixel.net")));
-	private final ButtonSetting serverButton = add(new ButtonSetting("server", this::serverText, this::serverButtonText, this::toggleCurrentServer));
-	private final ButtonSetting listButton = add(new ButtonSetting("server_list", this::listText, () -> "Standard", this::resetList));
+	private final ServerBlockList servers = ServerBlockList.add(this, List.of("hypixel.net"), () -> stopLooking(false));
 
 	private boolean toggled;
 	private float extraDistance;
@@ -51,107 +51,6 @@ public final class Freelook extends Module {
 				"Halte Linke Alt-Taste (änderbar unter Steuerung), um dich in der dritten Person umzuschauen, während du weiter geradeaus läufst. "
 						+ "Auf Servern, die das verbieten, bleibt es aus (Hypixel ist schon eingetragen).");
 		INSTANCE = this;
-	}
-
-	// ---- server block list ------------------------------------------------------------------
-
-	/** Host of the server you're on, lower case without port; null in singleplayer. */
-	private static @Nullable String currentHost() {
-		ServerData server = Minecraft.getInstance().getCurrentServer();
-
-		if (server == null || server.ip == null) {
-			return null;
-		}
-
-		return normalize(server.ip);
-	}
-
-	static String normalize(String address) {
-		String host = address.trim().toLowerCase(Locale.ROOT);
-
-		if (host.endsWith(".")) {
-			host = host.substring(0, host.length() - 1);
-		}
-
-		// Strip a port, but leave IPv6 addresses alone
-		int colon = host.lastIndexOf(':');
-
-		if (colon > 0 && host.indexOf(':') == colon) {
-			host = host.substring(0, colon);
-		}
-
-		return host;
-	}
-
-	/** True if {@code host} is a listed server or one of its subdomains (mc.hypixel.net matches hypixel.net). */
-	static boolean matches(String host, List<String> entries) {
-		for (String entry : entries) {
-			String blockedHost = normalize(entry);
-
-			if (!blockedHost.isEmpty() && (host.equals(blockedHost) || host.endsWith("." + blockedHost))) {
-				return true;
-			}
-		}
-
-		return false;
-	}
-
-	public boolean blockedHere() {
-		String host = currentHost();
-		return host != null && matches(host, blocked.get());
-	}
-
-	private String serverText() {
-		String host = currentHost();
-
-		if (host == null) {
-			return "Einzelspieler: immer erlaubt";
-		}
-
-		return host + (blockedHere() ? ": gesperrt" : ": erlaubt");
-	}
-
-	private String serverButtonText() {
-		String host = currentHost();
-
-		if (host == null) {
-			return "—";
-		}
-
-		return blockedHere() ? "Erlauben" : "Sperren";
-	}
-
-	private void toggleCurrentServer() {
-		String host = currentHost();
-
-		if (host == null) {
-			return;
-		}
-
-		List<String> list = blocked.get();
-
-		if (blockedHere()) {
-			// Remove every entry that covers this server
-			list.removeIf(entry -> {
-				String blockedHost = normalize(entry);
-				return host.equals(blockedHost) || host.endsWith("." + blockedHost);
-			});
-		} else {
-			list.add(host);
-			stopLooking(false);
-		}
-
-		Config.save();
-	}
-
-	private String listText() {
-		List<String> list = blocked.get();
-		return list.isEmpty() ? "Gesperrt: keine Server" : "Gesperrt: " + String.join(", ", list);
-	}
-
-	private void resetList() {
-		blocked.reset();
-		Config.save();
 	}
 
 	// ---- looking around ---------------------------------------------------------------------
@@ -172,7 +71,7 @@ public final class Freelook extends Module {
 		boolean keyDown = JuicedClient.FREELOOK_KEY != null && JuicedClient.FREELOOK_KEY.isDown();
 		boolean want = player != null && minecraft.gui.screen() == null && (mode.index() == 1 ? toggled : keyDown);
 
-		if (want && blockedHere()) {
+		if (want && servers.blockedHere()) {
 			if (pressed) {
 				noticeUntil = Clock.t() + 2.0;
 			}
@@ -204,6 +103,54 @@ public final class Freelook extends Module {
 		toggled = false;
 		noticeUntil = 0;
 		FreeCamera.stop(FreeCamera.Owner.FREELOOK, false);
+	}
+
+	/**
+	 * The menu shows Freelook with its own camera behind you (its close rear shot: body yaw - 35, pitch 12,
+	 * 3.2 blocks); Freelook itself never starts while a screen is open or another camera is active.
+	 */
+	@Override
+	public @Nullable String probeLiveReason(Minecraft minecraft) {
+		LocalPlayer player = minecraft.player;
+
+		if (player == null || !cameraFits(minecraft, player.yBodyRot - 35f, 12f, 3.2f)) {
+			return "Hier kein Platz hinter dir";
+		}
+
+		return null;
+	}
+
+	/**
+	 * True if a third-person camera turned to (yaw, pitch) has room at {@code distance} from your eyes: nothing
+	 * closer than 1.5 blocks on the way back, the same rule the menu camera uses for its shots.
+	 */
+	static boolean cameraFits(Minecraft minecraft, float yaw, float pitch, float distance) {
+		LocalPlayer player = minecraft.player;
+		ClientLevel level = minecraft.level;
+
+		if (player == null || level == null) {
+			return false;
+		}
+
+		Vec3 eye = player.getEyePosition();
+		double yawRad = Math.toRadians(yaw);
+		double pitchRad = Math.toRadians(pitch);
+		// The camera sits behind the eyes, against the way it looks
+		double dx = Math.sin(yawRad) * Math.cos(pitchRad) * distance;
+		double dy = Math.sin(pitchRad) * distance;
+		double dz = -Math.cos(yawRad) * Math.cos(pitchRad) * distance;
+		Vec3 end = new Vec3(eye.x + dx, eye.y + dy, eye.z + dz);
+		BlockHitResult hit = level.clip(new ClipContext(eye, end, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, player));
+
+		if (hit == null || hit.getType() == HitResult.Type.MISS) {
+			return true;
+		}
+
+		Vec3 at = hit.getLocation();
+		double hx = at.x - eye.x;
+		double hy = at.y - eye.y;
+		double hz = at.z - eye.z;
+		return hx * hx + hy * hy + hz * hz >= 1.5 * 1.5;
 	}
 
 	/** Called from MouseHandlerMixin. Returns true if the scroll changed the freelook distance. */

@@ -17,6 +17,7 @@ import dev.juiced.render.Gui2D;
 public final class Keystrokes extends HudModule {
 	private static final int KEY = 20;
 	private static final int GAP = 2;
+	private static final double DEMO_SECONDS = 3.2;
 
 	private final BoolSetting mouse = add(new BoolSetting("mouse", "Maustasten", true));
 	private final BoolSetting cps = add(new BoolSetting("cps", "CPS anzeigen", true));
@@ -57,9 +58,19 @@ public final class Keystrokes extends HudModule {
 	protected void draw(GuiGraphicsExtractor g, Hud hud, boolean editing) {
 		Options options = hud.minecraft.options;
 		KeyMapping[] keys = {options.keyUp, options.keyLeft, options.keyDown, options.keyRight, options.keyAttack, options.keyUse, options.keyJump, options.keyShift, options.keySprint};
+		boolean anyDown = false;
+
+		for (KeyMapping key : keys) {
+			anyDown |= key.isDown();
+		}
+
+		// Screens get the keys instead of the game, so in the menu and the HUD editor a little run plays instead
+		boolean demo = editing && !anyDown;
+		float t = (float) (Clock.t() % DEMO_SECONDS);
 
 		for (int i = 0; i < keys.length; i++) {
-			glow[i] = Clock.approach(glow[i], keys[i].isDown() ? 1f : 0f, keys[i].isDown() ? 40f : 9f);
+			boolean down = demo ? demoDown(i, t) : keys[i].isDown();
+			glow[i] = Clock.approach(glow[i], down ? 1f : 0f, down ? 40f : 9f);
 		}
 
 		int col = KEY + GAP;
@@ -71,8 +82,8 @@ public final class Keystrokes extends HudModule {
 
 		if (mouse.on()) {
 			int half = (width - GAP) / 2;
-			key(g, 0, y, half, KEY, "LMB", glow[4], cps.on() ? Clicks.leftCps() + " CPS" : null);
-			key(g, half + GAP, y, width - half - GAP, KEY, "RMB", glow[5], cps.on() ? Clicks.rightCps() + " CPS" : null);
+			key(g, 0, y, half, KEY, "LMB", glow[4], cps.on() ? (demo ? 10 : Clicks.leftCps()) + " CPS" : null);
+			key(g, half + GAP, y, width - half - GAP, KEY, "RMB", glow[5], cps.on() ? (demo ? 1 : Clicks.rightCps()) + " CPS" : null);
 			y += KEY + GAP;
 		}
 
@@ -88,6 +99,23 @@ public final class Keystrokes extends HudModule {
 			key(g, 0, y, half, 12, "Shift", glow[7], null);
 			key(g, half + GAP, y, width - half - GAP, 12, "Sprint", glow[8], null);
 		}
+	}
+
+	/**
+	 * The sample run, {@code t} seconds into it: forward with sprint and a burst of clicks, a strafe left, a jump,
+	 * a strafe right, then a step back while sneaking and a right click.
+	 */
+	private static boolean demoDown(int key, float t) {
+		return switch (key) {
+			case 0, 8 -> t < 2.2f;
+			case 1 -> t >= 0.7f && t < 1.0f;
+			case 2 -> t >= 2.5f && t < 2.8f;
+			case 3 -> t >= 1.5f && t < 1.8f;
+			case 4 -> t >= 0.3f && t < 1.9f && (t * 10f) % 1f < 0.4f;
+			case 5 -> t >= 2.4f && t < 2.6f;
+			case 6 -> t >= 1.1f && t < 1.3f;
+			default -> t >= 2.5f;
+		};
 	}
 
 	private void key(GuiGraphicsExtractor g, int x, int y, int w, int h, String label, float pressed, String sub) {

@@ -1,17 +1,21 @@
 package dev.juiced.modules.tweaks;
 
 import java.lang.reflect.Field;
+import java.util.List;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.renderpearl.api.textures.GpuTexture;
 import org.joml.Vector4f;
+import org.jspecify.annotations.Nullable;
 
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 
 import dev.juiced.JuicedClient;
 import dev.juiced.core.Category;
 import dev.juiced.core.Colors;
 import dev.juiced.core.Module;
+import dev.juiced.core.ServerBlockList;
 import dev.juiced.render.Gui2D;
 
 /** Everything fully lit, so caves and night fights are readable. Only changes how you see the world. */
@@ -21,14 +25,23 @@ public final class Fullbright extends Module {
 	private static Field textureField;
 	private static boolean broken;
 
+	private final ServerBlockList servers = ServerBlockList.add(this, List.of(), null);
+
 	public Fullbright() {
 		super("fullbright", "Fullbright", Category.TWEAKS, false,
-				"Alles ist voll beleuchtet: Höhlen und Nachtkämpfe sind hell und klar. Ändert nur, was du siehst.");
+				"Alles ist voll beleuchtet: Höhlen und Nachtkämpfe sind hell und klar. Ändert nur, was du siehst. "
+						+ "Auf Servern, die du sperrst, bleibt es aus.");
 		INSTANCE = this;
 	}
 
 	public static boolean active() {
-		return INSTANCE != null && INSTANCE.isEnabled() && !broken;
+		return INSTANCE != null && INSTANCE.isEnabled() && !broken && !INSTANCE.servers.blockedHere();
+	}
+
+	/** It lights everything at once, so it is always live; best seen at night or in a cave. */
+	@Override
+	public @Nullable String probeLiveReason(Minecraft minecraft) {
+		return broken ? "Hier nicht verfügbar" : null;
 	}
 
 	/**

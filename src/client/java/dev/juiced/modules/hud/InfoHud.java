@@ -5,6 +5,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.jspecify.annotations.Nullable;
+
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.multiplayer.ClientPacketListener;
@@ -15,6 +17,7 @@ import net.minecraft.client.player.LocalPlayer;
 import dev.juiced.core.Colors;
 import dev.juiced.core.Hud;
 import dev.juiced.core.HudModule;
+import dev.juiced.core.MenuState;
 import dev.juiced.core.Theme;
 import dev.juiced.core.setting.BoolSetting;
 import dev.juiced.core.setting.ChoiceSetting;
@@ -67,6 +70,19 @@ public final class InfoHud extends HudModule {
 		hasLast = true;
 	}
 
+	/** A position from long ago would make the next speed reading jump. */
+	@Override
+	protected void onDisable() {
+		hasLast = false;
+		blocksPerSecond = 0f;
+	}
+
+	@Override
+	public @Nullable String probeLiveReason(Minecraft minecraft) {
+		boolean any = fps.on() || ping.on() || coords.on() || direction.on() || speed.on() || clock.on() || server.on();
+		return any ? null : "Alle Zeilen ausgeschaltet";
+	}
+
 	@Override
 	protected boolean prepare(Hud hud, boolean editing) {
 		lines.clear();
@@ -77,7 +93,8 @@ public final class InfoHud extends HudModule {
 		}
 
 		if (fps.on()) {
-			lines.add(new String[] {"FPS", String.valueOf(FrameCounter.fps())});
+			// While the menu hides the HUD, the HUD layer that feeds FrameCounter may not run; the game's own count does
+			lines.add(new String[] {"FPS", String.valueOf(MenuState.hidesHud() ? hud.minecraft.getFps() : FrameCounter.fps())});
 		}
 
 		if (ping.on()) {

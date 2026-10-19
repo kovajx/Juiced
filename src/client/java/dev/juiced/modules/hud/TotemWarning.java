@@ -54,7 +54,8 @@ public final class TotemWarning extends HudModule {
 			state = outOfTotems.on() ? 2 : 0;
 		}
 
-		if (state != 0 && state != lastState && sound.on()) {
+		// Tuning in to it in the menu shows the warning but doesn't sound the alarm
+		if (state != 0 && state != lastState && sound.on() && isSwitchedOn()) {
 			Fx.sound("block.note_block.bass", 0.8f, state == 2 ? 0.6f : 0.9f);
 		}
 

@@ -39,6 +39,8 @@ public final class ModuleGroup extends Module {
 	private final List<BoolSetting> toggles = new ArrayList<>();
 	private ChoiceSetting kind;
 	private String kindLabel = "Art";
+	/** While the menu tries the card out: the one entry (choice) or part (bundle) to show, or -1. */
+	private int probeFocus = -1;
 
 	private ModuleGroup(String id, String name, Category category, boolean defaultEnabled, String description, boolean choice) {
 		super(id, name, category, defaultEnabled, description);
@@ -154,11 +156,90 @@ public final class ModuleGroup extends Module {
 			return -1;
 		}
 
-		return entries.get(Math.max(0, Math.min(entries.size() - 1, kind.index()))).part;
+		return activeEntry().part;
 	}
 
 	public List<Module> parts() {
 		return parts;
+	}
+
+	/** True for a card that wears one part at a time (with an "Art" list), false for a bundle. */
+	public boolean isChoice() {
+		return choice;
+	}
+
+	/** The "Art" list of a choice card, or null for a bundle. */
+	public @Nullable ChoiceSetting kindSetting() {
+		return kind;
+	}
+
+	/** Number of entries in the "Art" list (choice cards), 0 for bundles. */
+	public int entryCount() {
+		return choice ? entries.size() : 0;
+	}
+
+	public String entryLabel(int entry) {
+		return entries.get(entry).label;
+	}
+
+	/** The part an entry of the "Art" list belongs to. */
+	public int entryPart(int entry) {
+		return entries.get(entry).part;
+	}
+
+	/** The on/off switches of a bundle's parts, one per part (empty for choice cards). */
+	public List<BoolSetting> partToggles() {
+		return toggles;
+	}
+
+	/** Name of a bundle part as shown on its switch ("Low Fire"), or the part's own name for choice cards. */
+	public String partLabel(int part) {
+		if (!choice && part < toggles.size()) {
+			String label = toggles.get(part).label;
+			return label.startsWith("■ ") ? label.substring(2) : label;
+		}
+
+		return parts.get(part).name;
+	}
+
+	/**
+	 * While the menu tries the card out (and it isn't switched on), show only this entry (choice card) or part
+	 * (bundle), without changing the saved choice or switches. -1 shows the card as it is set up.
+	 */
+	public void setProbeFocus(int index) {
+		if (probeFocus != index) {
+			probeFocus = index;
+			sync();
+		}
+	}
+
+	public int probeFocus() {
+		return probeFocus;
+	}
+
+	/** True while only the menu runs the card, so the probe focus applies. */
+	private boolean probeOnly() {
+		return isProbing() && !isSwitchedOn();
+	}
+
+	/** The entry of the "Art" list that is worn right now (the probe focus while the menu tries it out). */
+	private Entry activeEntry() {
+		int index = probeOnly() && probeFocus >= 0 ? probeFocus : kind.index();
+		return entries.get(Math.max(0, Math.min(entries.size() - 1, index)));
+	}
+
+	/** Whether a bundle part runs while the card is on. */
+	private boolean partActive(int p) {
+		if (probeOnly()) {
+			if (probeFocus >= 0) {
+				return p == probeFocus;
+			}
+
+			// Tried out with every switch off: show the first part, like switching it on would
+			return toggles.get(p).on() || (p == 0 && toggles.stream().noneMatch(BoolSetting::on));
+		}
+
+		return toggles.get(p).on();
 	}
 
 	/** Index of the entry with this label, or -1. Used by the wardrobe. */
@@ -181,7 +262,7 @@ public final class ModuleGroup extends Module {
 				return;
 			}
 
-			Entry entry = entries.get(Math.max(0, Math.min(entries.size() - 1, kind.index())));
+			Entry entry = activeEntry();
 
 			if (entry.choiceId != null) {
 				Module part = parts.get(entry.part);
@@ -198,7 +279,7 @@ public final class ModuleGroup extends Module {
 			}
 		} else {
 			for (int p = 0; p < parts.size(); p++) {
-				parts.get(p).setEnabled(on && toggles.get(p).on());
+				parts.get(p).setEnabled(on && partActive(p));
 			}
 		}
 	}
@@ -207,8 +288,9 @@ public final class ModuleGroup extends Module {
 
 	@Override
 	protected void onEnable() {
-		// A bundle switched on with every part off would do nothing: turn on the first part
-		if (!choice && !toggles.isEmpty() && toggles.stream().noneMatch(BoolSetting::on)) {
+		// A bundle switched on with every part off would do nothing: turn on the first part.
+		// Not while the menu only tries it out, that must not change any saved switch.
+		if (!choice && isSwitchedOn() && !toggles.isEmpty() && toggles.stream().noneMatch(BoolSetting::on)) {
 			toggles.get(0).set(true);
 		}
 
@@ -217,15 +299,14 @@ public final class ModuleGroup extends Module {
 
 	@Override
 	protected void onDisable() {
-		if (!isEnabled()) {
-			sync();
-			return;
-		}
+		sync();
+	}
 
-		// Still on: this is "clear running effects" (leaving the world)
+	@Override
+	public void clearEffects() {
 		for (Module part : parts) {
 			if (part.isEnabled()) {
-				part.onDisable();
+				part.clearEffects();
 			}
 		}
 	}
@@ -316,6 +397,39 @@ public final class ModuleGroup extends Module {
 	}
 
 	@Override
+	public void probeTick(Minecraft minecraft, int ticks) {
+		for (Module part : parts) {
+			if (part.isEnabled()) {
+				part.probeTick(minecraft, ticks);
+			}
+		}
+	}
+
+	/** Live if any running part can be seen right now; otherwise the reason of the first running part. */
+	@Override
+	public @Nullable String probeLiveReason(Minecraft minecraft) {
+		String reason = null;
+		boolean any = false;
+
+		for (Module part : parts) {
+			if (part.isEnabled()) {
+				any = true;
+				String partReason = part.probeLiveReason(minecraft);
+
+				if (partReason == null) {
+					return null;
+				}
+
+				if (reason == null) {
+					reason = partReason;
+				}
+			}
+		}
+
+		return any ? reason : "Alle Teile ausgeschaltet";
+	}
+
+	@Override
 	public void onLand(Entity entity, float fallHeight) {
 		for (Module part : parts) {
 			if (part.isEnabled()) {
@@ -337,7 +451,7 @@ public final class ModuleGroup extends Module {
 
 			// Show the chosen look even while the card is off
 			if (part >= 0) {
-				Entry entry = entries.get(Math.max(0, Math.min(entries.size() - 1, kind.index())));
+				Entry entry = activeEntry();
 
 				if (entry.choiceId != null) {
 					for (Setting<?> setting : parts.get(part).settings) {
@@ -352,7 +466,12 @@ public final class ModuleGroup extends Module {
 			}
 		}
 
-		// Bundles: the first switched-on part, otherwise the first part
+		// Bundles: the part the menu focuses, else the first switched-on part, otherwise the first part
+		if (probeOnly() && probeFocus >= 0 && probeFocus < parts.size()) {
+			parts.get(probeFocus).drawPreview(graphics, x, y, w, h, time);
+			return;
+		}
+
 		for (int p = 0; p < toggles.size(); p++) {
 			if (toggles.get(p).on()) {
 				parts.get(p).drawPreview(graphics, x, y, w, h, time);
