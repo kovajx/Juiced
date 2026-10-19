@@ -191,6 +191,7 @@ public final class ProbeController {
 
 		if (minecraft.level != world) {
 			// Another world (a dimension change, a respawn): look for room for the camera and the dummy there
+			CombatEvents.endProbe(dummy.entity());
 			world = minecraft.level;
 			aimCamera(current, true);
 			reasonTimer = 0;
