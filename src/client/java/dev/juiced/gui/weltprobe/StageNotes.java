@@ -121,8 +121,8 @@ final class StageNotes {
 		String text = Ui.ellipsize(caption, Math.max(size, right - left - 16));
 		int half = Ui.width(text) / 2 + 4;
 		int cx = x + size / 2;
-		Ui.fill(g, cx - half, y + size + 6, cx + half, y + size + 17, 0x99000000);
-		Ui.centered(g, text, cx, y + size + 8, Ui.DIM);
+		Ui.fill(g, cx - half, y + size + 6, cx + half, y + size + 17, 0xCC0A0A0F);
+		Ui.centered(g, text, cx, y + size + 8, Ui.TEXT);
 	}
 
 	/** Frame position and size {x, y, size} centred in a region, kept clear of the coach mark. */

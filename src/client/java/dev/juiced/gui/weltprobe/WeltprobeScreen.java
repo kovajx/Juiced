@@ -337,8 +337,17 @@ public class WeltprobeScreen extends Screen implements CameraKeeper {
 		float topIn = openPhase(0.0, 0.2);
 
 		if (cardShown) {
-			float fade = hudStage.covers(l.cardX, l.cardY, l.cardX + l.cardW, l.cardY + l.cardH) ? 0.3f : 1f;
-			card.draw(g, l, hits, mouseX, mouseY, cardIn * fade, -Math.round(20f * (1f - cardIn)), search.active());
+			boolean covered = hudStage.covers(l.cardX, l.cardY, l.cardX + l.cardW, l.cardY + l.cardH);
+			int shift = 0;
+			int rightX = l.width - l.margin - l.cardW;
+
+			// A HUD element under the card (small GUI sizes): the card moves to the right side if that is free
+			if (covered && !drawer.isOpen() && !hudStage.covers(rightX, l.cardY, rightX + l.cardW, l.cardY + l.cardH)) {
+				shift = rightX - l.cardX;
+				covered = false;
+			}
+
+			card.draw(g, l, hits, mouseX, mouseY, cardIn * (covered ? 0.3f : 1f), -Math.round(20f * (1f - cardIn)) + shift, search.active());
 		}
 
 		float drawerFade = hudStage.covers(l.drawerX(drawer.dockedLeft()), l.drawerY1(drawer.dockedLeft()),
@@ -742,7 +751,8 @@ public class WeltprobeScreen extends Screen implements CameraKeeper {
 
 	@Override
 	public boolean keyPressed(KeyEvent event) {
-		if (JuicedClient.MENU_KEY != null && JuicedClient.MENU_KEY.matches(event)) {
+		// While a query is being typed the menu key (Right Shift) is a Shift for capital letters, not "close"
+		if (JuicedClient.MENU_KEY != null && JuicedClient.MENU_KEY.matches(event) && !(search.active() && !search.done())) {
 			// The held key that opened the menu repeats; only a new press closes
 			double now = Clock.t();
 			boolean repeat = menuKeyHeld && now - menuKeyAt < REPEAT_WINDOW;

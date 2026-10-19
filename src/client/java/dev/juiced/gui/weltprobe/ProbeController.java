@@ -246,7 +246,8 @@ public final class ProbeController {
 			}
 
 			// Back from another world, or the ground changed: look for a spot again
-			if (needsDummy && !blocked && !dummy.placed() && !dummy.regrowing()) {
+			// (not while the old one still finishes a flight or a totem ring: it would just be kept where it is)
+			if (needsDummy && !blocked && !dummy.placed() && !dummy.regrowing() && dummy.entity() == null) {
 				placeDummy();
 			}
 

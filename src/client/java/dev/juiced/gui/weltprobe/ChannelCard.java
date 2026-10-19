@@ -121,8 +121,11 @@ final class ChannelCard {
 		int switchW = w >= 300 ? 76 : 56;
 		int switchX = x + w - 8 - switchW;
 		String name = part ? hit.label() : channel.name();
-		name = Ui.ellipsize(name, switchX - 10 - (x + 10), "..", 2f);
-		Gui2D.text(g, name, x + 10, y + 20, Colors.fade(Ui.TEXT, Ui.alpha), false, 2f);
+		int room = switchX - 10 - (x + 10);
+		// Long names on narrow cards step down a size before they get cut
+		float nameScale = Gui2D.width(name, 2f) <= room ? 2f : 1.5f;
+		name = Ui.ellipsize(name, room, "..", nameScale);
+		Gui2D.text(g, name, x + 10, y + (nameScale == 2f ? 20 : 23), Colors.fade(Ui.TEXT, Ui.alpha), false, nameScale);
 		drawSwitch(g, hits, module, switchX, y + 20, switchW, mouseX, mouseY, live);
 
 		// Description (first sentence) and the style row
@@ -217,11 +220,14 @@ final class ChannelCard {
 		}
 	}
 
-	/** "Art  < Kirschblüten >  Pfeil hoch/runter". */
+	/** "Art  < Kirschblüten >  Pfeil hoch/runter", with the style setting's own name in front. */
 	private void drawStyle(GuiGraphicsExtractor g, Hits hits, Channel channel, @Nullable SearchHit hit, boolean part, ChoiceSetting style,
 			int x, int y, int w, int mouseX, int mouseY, boolean live) {
 		int right = x + w - 8;
-		int valueX = x + 46;
+		// The setting's own name: "Art", "Stil", "Format", "Anordnung" ...
+		String label = style.label;
+		int arrowX = Math.max(x + 34, x + 10 + Ui.width(label) + 6);
+		int valueX = arrowX + 12;
 		int hintW = Ui.width(STYLE_HINT);
 		int valueW = Math.min(128, right - valueX - 20 - hintW);
 		boolean hint = valueW >= 80;
@@ -230,8 +236,8 @@ final class ChannelCard {
 			valueW = Math.min(128, right - valueX - 12);
 		}
 
-		Ui.text(g, "Art", x + 10, y, Ui.MUTED);
-		arrow(g, hits, "<", x + 34, y - 2, mouseX, mouseY, live, () -> menu.changeStyle(-1));
+		Ui.text(g, label, x + 10, y, Ui.MUTED);
+		arrow(g, hits, "<", arrowX, y - 2, mouseX, mouseY, live, () -> menu.changeStyle(-1));
 		arrow(g, hits, ">", valueX + valueW + 2, y - 2, mouseX, mouseY, live, () -> menu.changeStyle(1));
 
 		// A search hit on a choice entry shows that entry while it is only tried out
